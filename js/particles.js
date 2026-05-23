@@ -10,6 +10,8 @@ const RotationSpeed = 0.02;
 let scene, camera, renderer, particles, geometry;
 let positions, colors, velocities;
 let clock = new THREE.Clock();
+let animating = true;
+let handleResize;
 
 const gestureColors = {
   open:   { r: 0.0, g: 0.94, b: 1.0 },
@@ -19,6 +21,8 @@ const gestureColors = {
 };
 let targetColor = gestureColors.open;
 let currentColor = { ...gestureColors.open };
+
+const ORIGIN = new THREE.Vector3(0, 0, 0);
 
 const cursor3D = new THREE.Vector3(0, 0, 0);
 const cursorTarget = new THREE.Vector3(0, 0, 0);
@@ -66,16 +70,18 @@ export function initParticles(canvas) {
   particles = new THREE.Points(geometry, material);
   scene.add(particles);
 
-  window.addEventListener('resize', () => {
+  handleResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+  };
+  window.addEventListener('resize', handleResize);
 
   animate();
 }
 
 function animate() {
+  if (!animating) return;
   requestAnimationFrame(animate);
 
   const dt = Math.min(clock.getDelta(), 0.1);
@@ -97,10 +103,11 @@ function animate() {
   currentColor.b += (targetColor.b - currentColor.b) * lerpSpeed;
 
   const hasHand = conf > 0.7;
-  const forceCenter = hasHand ? cursor3D : new THREE.Vector3(0, 0, 0);
+  const forceCenter = hasHand ? cursor3D : ORIGIN;
   const forceRadius = hasHand ? 1.5 : 999;
   const time = performance.now() * 0.001;
 
+  // gesture is captured once per frame, outside the loop — no per-particle switch overhead
   for (let i = 0; i < ParticleCount; i++) {
     const i3 = i * 3;
     let px = positions[i3];
@@ -139,8 +146,19 @@ function animate() {
         const beamLen = (i / ParticleCount) * 4 - 2;
         const spread = (1 - i / ParticleCount) * 0.15;
         tx = beamLen;
-        ty = (Math.random() - 0.5) * spread;
-        tz = (Math.random() - 0.5) * spread;
+        // Deterministic spread using particle index
+        const offset1 = ((i * 2654435761) % 1000) / 1000 - 0.5;
+        const offset2 = ((i * 1597334677) % 1000) / 1000 - 0.5;
+        ty = offset1 * spread;
+        tz = offset2 * spread;
+        break;
+      }
+      default: {
+        // Fallback to nebula
+        const fd = Math.sqrt(px * px + py * py + pz * pz) + 0.001;
+        tx = (px / fd) * 2.5;
+        ty = (py / fd) * 2.5;
+        tz = (pz / fd) * 2.5;
         break;
       }
     }
@@ -188,4 +206,20 @@ function animate() {
   geometry.attributes.color.needsUpdate = true;
 
   renderer.render(scene, camera);
+}
+
+export function disposeParticles() {
+  animating = false;
+  if (renderer) {
+    renderer.dispose();
+    renderer = null;
+  }
+  if (geometry) {
+    geometry.dispose();
+    geometry = null;
+  }
+  if (particles && particles.material) {
+    particles.material.dispose();
+  }
+  window.removeEventListener('resize', handleResize);
 }
