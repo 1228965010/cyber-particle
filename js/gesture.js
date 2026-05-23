@@ -27,11 +27,11 @@ export function getConfidence() { return handConfidence; }
 
 export async function initGesture(videoEl) {
   const { HandLandmarker, FilesetResolver } = await import(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm.js'
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21'
   );
 
   const vision = await FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm'
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm'
   );
 
   handLandmarker = await HandLandmarker.createFromOptions(vision, {
