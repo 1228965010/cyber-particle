@@ -1,0 +1,170 @@
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0f;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+  color: #00f0ff;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+}
+
+#webcam {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#particle-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Hex grid background */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* CRT scanlines */
+#scanlines {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Vignette */
+#vignette {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+  z-index: 9;
+  pointer-events: none;
+}
+
+/* HUD */
+#hud {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#gesture-name {
+  position: fixed;
+  bottom: 60px;
+  left: 40px;
+  font-size: 48px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(0, 240, 255, 0.8), 0 0 60px rgba(0, 240, 255, 0.4);
+}
+
+.cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+#gesture-bar {
+  position: fixed;
+  bottom: 30px;
+  left: 40px;
+  display: flex;
+  gap: 20px;
+}
+
+.bar-segment {
+  font-size: 11px;
+  letter-spacing: 2px;
+  opacity: 0.3;
+  transition: opacity 0.3s, text-shadow 0.3s;
+}
+
+.bar-segment.active {
+  opacity: 1;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.bar-segment[data-gesture="open"] { color: #00f0ff; }
+.bar-segment[data-gesture="fist"] { color: #ff00ff; }
+.bar-segment[data-gesture="pinch"] { color: #00ff88; }
+.bar-segment[data-gesture="point"] { color: #ff3366; }
+
+#sys-info {
+  position: fixed;
+  top: 30px;
+  right: 40px;
+  display: flex;
+  gap: 30px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  opacity: 0.5;
+}
+
+#permission-prompt {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: all;
+  z-index: 30;
+}
+
+#permission-prompt p {
+  font-size: 24px;
+  letter-spacing: 4px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+}
+
+#enable-camera {
+  background: transparent;
+  border: 1px solid #00f0ff;
+  color: #00f0ff;
+  padding: 12px 40px;
+  font-family: inherit;
+  font-size: 16px;
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+#enable-camera:hover {
+  background: rgba(0, 240, 255, 0.1);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+}
+
+.hidden {
+  display: none !important;
+}

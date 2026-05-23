@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyber Particle</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <video id="webcam" autoplay playsinline></video>
+  <canvas id="particle-canvas"></canvas>
+
+  <div id="hud">
+    <div id="gesture-name">INITIALIZING<span class="cursor">_</span></div>
+    <div id="gesture-bar">
+      <span class="bar-segment" data-gesture="open">OPEN</span>
+      <span class="bar-segment" data-gesture="fist">FIST</span>
+      <span class="bar-segment" data-gesture="pinch">PINCH</span>
+      <span class="bar-segment" data-gesture="point">POINT</span>
+    </div>
+    <div id="sys-info">
+      <span id="fps-display">FPS: --</span>
+      <span id="particle-count">PARTICLES: 15000</span>
+      <span id="confidence-display">CONF: --</span>
+    </div>
+    <div id="permission-prompt" class="hidden">
+      <p>CAMERA ACCESS REQUIRED</p>
+      <button id="enable-camera">ENABLE</button>
+    </div>
+  </div>
+
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm"></script>
+  <script type="module" src="js/particles.js"></script>
+  <script type="module" src="js/gesture.js"></script>
+  <script type="module" src="js/hud.js"></script>
+</body>
+</html>
