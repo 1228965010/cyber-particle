@@ -56,6 +56,7 @@ export async function initGesture(videoEl) {
     if (err.name === 'NotAllowedError') {
       document.getElementById('permission-prompt').classList.remove('hidden');
       document.getElementById('enable-camera').onclick = () => location.reload();
+      return;
     }
     throw err;
   }
@@ -70,8 +71,12 @@ function detectLoop() {
 
   if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
-    const results = handLandmarker.detectForVideo(video, performance.now());
-    processResults(results);
+    try {
+      const results = handLandmarker.detectForVideo(video, performance.now());
+      processResults(results);
+    } catch (e) {
+      console.warn('Detection frame error:', e);
+    }
   }
 
   requestAnimationFrame(detectLoop);
@@ -105,8 +110,8 @@ function classifyGesture(lm) {
   }
 
   const [thumb, index, middle, ring, pinky] = fingersExtended;
-  const thumbTip = lm[4];
-  const indexTip = lm[8];
+  const thumbTip = lm[FingerTipIds[0]];
+  const indexTip = lm[FingerTipIds[1]];
   const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
 
   let gesture = currentGesture;
