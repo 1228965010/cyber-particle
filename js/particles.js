@@ -7,6 +7,20 @@ const Damping = 0.92;
 const ForceStrength = 0.003;
 const RotationSpeed = 0.02;
 
+let particleCount = ParticleCount;
+const LowCount = 5000;
+const MediumCount = 8000;
+
+export function setParticleCount(count) {
+  particleCount = count;
+  const el = document.getElementById('particle-count');
+  if (el) el.textContent = `PARTICLES: ${count}`;
+}
+
+if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) {
+  particleCount = LowCount;
+}
+
 let scene, camera, renderer, particles, geometry;
 let positions, colors, velocities;
 let clock = new THREE.Clock();
@@ -108,7 +122,7 @@ function animate() {
   const time = performance.now() * 0.001;
 
   // gesture is captured once per frame, outside the loop — no per-particle switch overhead
-  for (let i = 0; i < ParticleCount; i++) {
+  for (let i = 0; i < particleCount; i++) {
     const i3 = i * 3;
     let px = positions[i3];
     let py = positions[i3 + 1];

@@ -40,7 +40,7 @@
   <div id="vignette"></div>
 
   <script type="module">
-    import { initParticles } from './js/particles.js';
+    import { initParticles, setParticleCount } from './js/particles.js';
     import { initGesture } from './js/gesture.js';
     import './js/hud.js';
 
@@ -65,6 +65,12 @@
       if (err.name === 'NotAllowedError') {
         prompt.classList.remove('hidden');
       }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '1') setParticleCount(5000);
+      if (e.key === '2') setParticleCount(8000);
+      if (e.key === '3') setParticleCount(15000);
     });
   </script>
 </body>
