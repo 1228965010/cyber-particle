@@ -39,9 +39,33 @@
   <div id="scanlines"></div>
   <div id="vignette"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm"></script>
-  <script type="module" src="js/particles.js"></script>
-  <script type="module" src="js/gesture.js"></script>
-  <script type="module" src="js/hud.js"></script>
+  <script type="module">
+    import { initParticles } from './js/particles.js';
+    import { initGesture } from './js/gesture.js';
+    import './js/hud.js';
+
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('particle-canvas');
+    const prompt = document.getElementById('permission-prompt');
+    const enableBtn = document.getElementById('enable-camera');
+
+    enableBtn.addEventListener('click', async () => {
+      prompt.classList.add('hidden');
+      try {
+        await initGesture(video);
+      } catch (e) {
+        prompt.classList.remove('hidden');
+        console.error('Camera init failed:', e);
+      }
+    });
+
+    initParticles(canvas);
+
+    initGesture(video).catch((err) => {
+      if (err.name === 'NotAllowedError') {
+        prompt.classList.remove('hidden');
+      }
+    });
+  </script>
 </body>
 </html>
