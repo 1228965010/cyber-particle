@@ -19,6 +19,7 @@ let handConfidence = 0;
 let running = false;
 let lastVideoTime = -1;
 let cameraStream = null;
+let videoElement = null;
 
 export function getGesture() { return currentGesture; }
 export function getHandCenter() { return handCenter; }
@@ -40,7 +41,7 @@ export async function initGesture(videoEl) {
     },
     runningMode: 'VIDEO',
     numHands: 1,
-    minHandDetectionConfidence: 0.7,
+    minHandDetectionConfidence: ConfidenceThreshold,
     minTrackingConfidence: 0.5,
   });
 
@@ -49,6 +50,7 @@ export async function initGesture(videoEl) {
       video: { width: 1280, height: 720, facingMode: 'user' },
     });
     videoEl.srcObject = cameraStream;
+    videoElement = videoEl;
     await videoEl.play();
   } catch (err) {
     if (err.name === 'NotAllowedError') {
@@ -63,8 +65,8 @@ export async function initGesture(videoEl) {
 }
 
 function detectLoop() {
-  if (!running) return;
-  const video = document.getElementById('webcam');
+  if (!running || !videoElement) return;
+  const video = videoElement;
 
   if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
@@ -78,7 +80,11 @@ function detectLoop() {
 function processResults(results) {
   if (results.landmarks && results.landmarks.length > 0) {
     const lm = results.landmarks[0];
-    handConfidence = results.worldLandmarks ? 0.9 : 0.8;
+    if (results.handedness && results.handedness.length > 0) {
+      handConfidence = results.handedness[0].score;
+    } else {
+      handConfidence = 0.8; // fallback if handedness not available
+    }
     handCenter = { x: lm[MiddleMcpId].x, y: lm[MiddleMcpId].y };
     classifyGesture(lm);
   } else {
