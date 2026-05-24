@@ -1,15 +1,13 @@
-// Cyber Particle — Three.js Particle Engine
-// Trail-flow style: spring physics with speed gradient for natural trail effect
+// Cyber Particle — Ambient Particle Field + Hand Disturbance
 import * as THREE from 'three';
 import { getGesture, getHandCenter, getConfidence } from './gesture.js';
 
-const ParticleCount = 15000;
-const Damping = 0.85;
-const RotationSpeed = 0.015;
+const ParticleCount = 12000;
+const Damping = 0.93;
 
 let particleCount = ParticleCount;
-const LowCount = 5000;
-const MediumCount = 8000;
+const LowCount = 4000;
+const MediumCount = 7000;
 
 export function setParticleCount(count) {
   particleCount = count;
@@ -21,21 +19,21 @@ if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) {
   particleCount = LowCount;
 }
 
-let scene, camera, renderer, particles, geometry;
-let positions, colors, velocities;
-let springStiffness;
+let scene, camera, renderer, geometry;
+let positions, colors, velocities, basePositions, phases;
 let clock = new THREE.Clock();
 let animating = true;
 let handleResize;
 
-const gestureColors = {
-  open:  [0.0, 0.94, 1.0],
-  fist:  [1.0, 0.0, 1.0],
-  pinch: [0.0, 1.0, 0.53],
-  point: [1.0, 0.2, 0.4],
+const palettes = {
+  open:  [[0.0, 0.95, 1.0], [0.3, 0.5, 1.0], [0.0, 0.7, 0.9]],
+  fist:  [[1.0, 0.1, 0.5], [0.9, 0.2, 0.0], [1.0, 0.4, 0.7]],
+  pinch: [[0.0, 1.0, 0.5], [0.2, 0.9, 0.4], [0.0, 0.7, 0.6]],
+  point: [[1.0, 0.1, 0.2], [1.0, 0.3, 0.1], [0.9, 0.2, 0.4]],
 };
-let targetColor = gestureColors.open;
-let currentColor = [...gestureColors.open];
+let currentPalette = palettes.open;
+let targetPalette = palettes.open;
+let paletteLerp = 1.0;
 
 const cursor3D = new THREE.Vector3(0, 0, 0);
 const cursorTarget = new THREE.Vector3(0, 0, 0);
@@ -49,18 +47,30 @@ function createGlowTexture() {
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.05, 'rgba(255,255,255,0.95)');
-  gradient.addColorStop(0.15, 'rgba(255,255,255,0.7)');
-  gradient.addColorStop(0.35, 'rgba(255,255,255,0.25)');
-  gradient.addColorStop(0.6, 'rgba(255,255,255,0.05)');
+  gradient.addColorStop(0.04, 'rgba(255,255,255,0.9)');
+  gradient.addColorStop(0.12, 'rgba(255,255,255,0.5)');
+  gradient.addColorStop(0.3, 'rgba(255,255,255,0.12)');
+  gradient.addColorStop(0.55, 'rgba(255,255,255,0.02)');
   gradient.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
   return new THREE.CanvasTexture(canvas);
 }
 
+function pickColor(palette, i, time) {
+  const idx = i % palette.length;
+  const c = palette[idx];
+  const brightness = 0.6 + 0.4 * Math.sin(i * 0.05 + time * 0.7);
+  return [c[0] * brightness, c[1] * brightness, c[2] * brightness];
+}
+
+function lerpColor(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
 export function initParticles(canvas) {
   scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0a0f, 0.00015);
 
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.z = 6;
@@ -73,46 +83,47 @@ export function initParticles(canvas) {
 
   geometry = new THREE.BufferGeometry();
   positions = new Float32Array(ParticleCount * 3);
+  basePositions = new Float32Array(ParticleCount * 3);
   colors = new Float32Array(ParticleCount * 3);
   velocities = new Float32Array(ParticleCount * 3);
-  springStiffness = new Float32Array(ParticleCount);
+  phases = new Float32Array(ParticleCount);
 
   for (let i = 0; i < ParticleCount; i++) {
     const i3 = i * 3;
-    // Wide initial spread
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    const r = 0.5 + Math.random() * 4;
-    positions[i3] = Math.sin(phi) * Math.cos(theta) * r;
-    positions[i3 + 1] = Math.sin(phi) * Math.sin(theta) * r;
-    positions[i3 + 2] = Math.cos(phi) * r * 0.6;
-    colors[i3] = currentColor[0];
-    colors[i3 + 1] = currentColor[1];
-    colors[i3 + 2] = currentColor[2];
+    // Spread across entire visible volume (wider than screen)
+    const x = (Math.random() - 0.5) * 14;
+    const y = (Math.random() - 0.5) * 10;
+    const z = (Math.random() - 0.5) * 8;
+    positions[i3] = x;
+    positions[i3 + 1] = y;
+    positions[i3 + 2] = z;
+    basePositions[i3] = x;
+    basePositions[i3 + 1] = y;
+    basePositions[i3 + 2] = z;
+    const c = pickColor(currentPalette, i, 0);
+    colors[i3] = c[0];
+    colors[i3 + 1] = c[1];
+    colors[i3 + 2] = c[2];
     velocities[i3] = 0;
     velocities[i3 + 1] = 0;
     velocities[i3 + 2] = 0;
-    // Key: each particle has different spring stiffness for trail effect
-    // Stiffness varies from 0.003 (slow, trailing far behind) to 0.08 (fast, close to hand)
-    const t = i / ParticleCount;
-    springStiffness[i] = 0.003 + t * t * 0.077;
+    phases[i] = Math.random() * Math.PI * 2;
   }
 
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const material = new THREE.PointsMaterial({
-    size: 0.07,
+    size: 0.05,
     map: glowTexture,
     vertexColors: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.8,
   });
 
-  particles = new THREE.Points(geometry, material);
-  scene.add(particles);
+  scene.add(new THREE.Points(geometry, material));
 
   handleResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -132,117 +143,72 @@ function animate() {
   const gesture = getGesture();
   const center = getHandCenter();
   const conf = getConfidence();
+  const hasHand = conf > 0.7;
+  const time = performance.now() * 0.001;
 
-  // Smooth cursor with different speeds for trail
+  // Hand position in 3D space
   cursorTarget.set(
-    (center.x - 0.5) * 8,
-    -(center.y - 0.5) * 5.5,
+    (center.x - 0.5) * 10,
+    -(center.y - 0.5) * 7,
     0
   );
-
-  const hasHand = conf > 0.7;
-  if (hasHand) {
-    prevCursor.copy(cursor3D);
-    cursor3D.lerp(cursorTarget, 0.15);
-  } else {
-    cursor3D.lerp(new THREE.Vector3(0, 0, 0), 0.02);
-  }
-
-  // Hand velocity for trail elongation
+  prevCursor.copy(cursor3D);
+  cursor3D.lerp(cursorTarget, hasHand ? 0.12 : 0.03);
   const handSpeed = prevCursor.distanceTo(cursor3D) / Math.max(dt, 0.001);
-  const trailLength = hasHand ? 0.3 + handSpeed * 0.3 : 0;
 
-  // Color transition
-  const tc = gestureColors[gesture] || gestureColors.open;
-  targetColor = tc;
-  const ls = 2.5 * dt;
-  currentColor[0] += (targetColor[0] - currentColor[0]) * ls;
-  currentColor[1] += (targetColor[1] - currentColor[1]) * ls;
-  currentColor[2] += (targetColor[2] - currentColor[2]) * ls;
-
-  const time = performance.now() * 0.001;
+  // Palette transition
+  targetPalette = palettes[gesture] || palettes.open;
+  paletteLerp += (1.0 - paletteLerp) * 2.0 * dt;
+  if (paletteLerp > 0.99) {
+    currentPalette = targetPalette;
+    paletteLerp = 1.0;
+  }
 
   for (let i = 0; i < particleCount; i++) {
     const i3 = i * 3;
-    let px = positions[i3];
-    let py = positions[i3 + 1];
-    let pz = positions[i3 + 2];
+    const px = positions[i3];
+    const py = positions[i3 + 1];
+    const pz = positions[i3 + 2];
+    const bx = basePositions[i3];
+    const by = basePositions[i3 + 1];
+    const bz = basePositions[i3 + 2];
 
-    const stiffness = springStiffness[i];
+    // Distance from hand
+    const dx = px - cursor3D.x;
+    const dy = py - cursor3D.y;
+    const dz = pz - cursor3D.z;
+    const distToHand = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
 
-    // Gesture-specific target position
-    let tx, ty, tz;
-    const angle = (i / ParticleCount) * Math.PI * 16 + time * RotationSpeed;
+    // Base gentle floating motion (ambient drift)
+    const floatX = Math.sin(time * 0.3 + phases[i]) * 0.003;
+    const floatY = Math.cos(time * 0.4 + phases[i] * 1.3) * 0.003;
+    const floatZ = Math.sin(time * 0.35 + phases[i] * 0.7) * 0.002;
+
+    let fx = (bx - px) * 0.005 + floatX;
+    let fy = (by - py) * 0.005 + floatY;
+    let fz = (bz - pz) * 0.005 + floatZ;
 
     if (hasHand) {
-      // Use gesture-specific shapes around hand position
-      const cx = cursor3D.x;
-      const cy = cursor3D.y;
-      const cz = cursor3D.z;
+      // Hand influence: ripple effect
+      const influenceRadius = 3.0 + handSpeed * 0.5;
+      if (distToHand < influenceRadius) {
+        const influence = 1.0 - distToHand / influenceRadius;
+        // Push particles outward from hand (ripple)
+        const pushForce = influence * influence * 0.04;
+        fx += (dx / distToHand) * pushForce;
+        fy += (dy / distToHand) * pushForce;
+        fz += (dz / distToHand) * pushForce * 0.5;
 
-      switch (gesture) {
-        case 'open':
-          // Nebula burst around hand
-          {
-            const a = angle;
-            const rad = 0.8 + stiffness * 15;
-            tx = cx + Math.cos(a) * rad;
-            ty = cy + Math.sin(a * 1.3) * rad * 0.7;
-            tz = cz + Math.sin(a * 0.7) * rad * 0.5;
-          }
-          break;
-        case 'fist':
-          // Tight sphere
-          {
-            const phi = Math.acos(2 * (i / ParticleCount) - 1);
-            const r = 0.5 + stiffness * 5;
-            tx = cx + Math.sin(phi) * Math.cos(angle) * r;
-            ty = cy + Math.sin(phi) * Math.sin(angle) * r;
-            tz = cz + Math.cos(phi) * r;
-          }
-          break;
-        case 'pinch':
-          // Spiral
-          {
-            const sr = 0.15 + stiffness * 12;
-            const sa = angle * 2 + sr * 2;
-            tx = cx + Math.cos(sa) * sr;
-            ty = cy + Math.sin(sa) * sr * 0.4;
-            tz = cz + Math.sin(sa * 0.5) * 0.8;
-          }
-          break;
-        case 'point':
-          // Beam
-          {
-            const bl = stiffness * 15 - 3;
-            const spread = 0.1 + (1 - stiffness) * 0.5;
-            const o1 = ((i * 2654435761) % 1000) / 1000 - 0.5;
-            const o2 = ((i * 1597334677) % 1000) / 1000 - 0.5;
-            tx = cx + bl;
-            ty = cy + o1 * spread;
-            tz = cz + o2 * spread;
-          }
-          break;
-        default:
-          tx = cx; ty = cy; tz = cz;
+        // Tangential swirl
+        const swirlForce = influence * 0.01;
+        fx += -dz * swirlForce;
+        fz += dx * swirlForce;
       }
-    } else {
-      // Idle: gentle flowing drift
-      tx = px + Math.sin(time * 0.5 + i * 0.003) * 0.02;
-      ty = py + Math.cos(time * 0.6 + i * 0.004) * 0.02;
-      tz = pz + Math.sin(time * 0.4 + i * 0.005) * 0.015;
     }
 
-    // Spring force: pull toward target with individual stiffness (creates trail)
-    const fx = (tx - px) * stiffness;
-    const fy = (ty - py) * stiffness;
-    const fz = (tz - pz) * stiffness;
-
-    // Add organic noise wobble
-    const noiseAmp = hasHand ? 0.0003 : 0.0001;
-    velocities[i3] += fx + Math.sin(time * 3 + i * 0.1) * noiseAmp;
-    velocities[i3 + 1] += fy + Math.cos(time * 2.5 + i * 0.1) * noiseAmp;
-    velocities[i3 + 2] += fz + Math.sin(time * 2.8 + i * 0.12) * noiseAmp;
+    velocities[i3] += fx;
+    velocities[i3 + 1] += fy;
+    velocities[i3 + 2] += fz;
 
     velocities[i3] *= Damping;
     velocities[i3 + 1] *= Damping;
@@ -252,19 +218,21 @@ function animate() {
     positions[i3 + 1] += velocities[i3 + 1];
     positions[i3 + 2] += velocities[i3 + 2];
 
-    // Color: brightness based on closeness to hand (near = bright, far = dim = trail)
-    const dx = positions[i3] - cursor3D.x;
-    const dy = positions[i3 + 1] - cursor3D.y;
-    const dz = positions[i3 + 2] - cursor3D.z;
-    const distToHand = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    const brightness = hasHand
-      ? Math.max(0.15, 1.0 - distToHand / (5 + trailLength))
-      : 0.2 + 0.1 * Math.sin(i * 0.02 + time);
+    // Color: blend between current and target palette, brightness from hand proximity
+    const lerpT = Math.min(paletteLerp, 1.0);
+    const tc = targetPalette[i % targetPalette.length];
+    const cc = currentPalette[i % currentPalette.length];
+    const blended = lerpColor(cc, tc, lerpT);
 
-    const flicker = 0.9 + 0.1 * Math.sin(i * 0.3 + time * 5);
-    colors[i3] = currentColor[0] * brightness * flicker;
-    colors[i3 + 1] = currentColor[1] * brightness * flicker;
-    colors[i3 + 2] = currentColor[2] * brightness * flicker;
+    let brightness = 0.35 + 0.15 * Math.sin(phases[i] + time * 0.5);
+    if (hasHand && distToHand < 4.0) {
+      brightness += (1.0 - distToHand / 4.0) * 0.5;
+    }
+    brightness = Math.min(brightness, 1.0);
+
+    colors[i3] = blended[0] * brightness;
+    colors[i3 + 1] = blended[1] * brightness;
+    colors[i3 + 2] = blended[2] * brightness;
   }
 
   geometry.attributes.position.needsUpdate = true;
@@ -277,9 +245,7 @@ export function disposeParticles() {
   animating = false;
   if (renderer) { renderer.dispose(); renderer = null; }
   if (geometry) { geometry.dispose(); geometry = null; }
-  if (particles && particles.material) {
-    particles.material.map?.dispose();
-    particles.material.dispose();
-  }
+  const pts = scene?.children[0];
+  if (pts?.material) { pts.material.map?.dispose(); pts.material.dispose(); }
   window.removeEventListener('resize', handleResize);
 }
