@@ -1,9 +1,9 @@
-// Cyber Particle — Ambient Particle Field + Hand Disturbance
+// Cyber Particle — Strong Hand-Responsive Particle Field
 import * as THREE from 'three';
 import { getGesture, getHandCenter, getConfidence } from './gesture.js';
 
-const ParticleCount = 12000;
-const Damping = 0.93;
+const ParticleCount = 10000;
+const Damping = 0.88;
 
 let particleCount = ParticleCount;
 const LowCount = 4000;
@@ -20,24 +20,20 @@ if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) {
 }
 
 let scene, camera, renderer, geometry;
-let positions, colors, velocities, basePositions, phases;
+let positions, colors, velocities, restPositions;
 let clock = new THREE.Clock();
 let animating = true;
 let handleResize;
 
 const palettes = {
-  open:  [[0.0, 0.95, 1.0], [0.3, 0.5, 1.0], [0.0, 0.7, 0.9]],
-  fist:  [[1.0, 0.1, 0.5], [0.9, 0.2, 0.0], [1.0, 0.4, 0.7]],
-  pinch: [[0.0, 1.0, 0.5], [0.2, 0.9, 0.4], [0.0, 0.7, 0.6]],
-  point: [[1.0, 0.1, 0.2], [1.0, 0.3, 0.1], [0.9, 0.2, 0.4]],
+  open:  [[0.0, 0.95, 1.0], [0.2, 0.5, 1.0], [0.0, 0.7, 0.9]],
+  fist:  [[1.0, 0.1, 0.5], [1.0, 0.5, 0.1], [0.9, 0.2, 0.6]],
+  pinch: [[0.0, 1.0, 0.5], [0.1, 0.9, 0.3], [0.0, 0.7, 0.6]],
+  point: [[1.0, 0.1, 0.2], [1.0, 0.4, 0.1], [0.9, 0.2, 0.4]],
 };
-let currentPalette = palettes.open;
-let targetPalette = palettes.open;
-let paletteLerp = 1.0;
 
 const cursor3D = new THREE.Vector3(0, 0, 0);
 const cursorTarget = new THREE.Vector3(0, 0, 0);
-const prevCursor = new THREE.Vector3(0, 0, 0);
 
 function createGlowTexture() {
   const size = 128;
@@ -47,30 +43,19 @@ function createGlowTexture() {
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.15, 'rgba(255,255,255,0.9)');
-  gradient.addColorStop(0.35, 'rgba(255,255,255,0.5)');
-  gradient.addColorStop(0.55, 'rgba(255,255,255,0.15)');
-  gradient.addColorStop(0.75, 'rgba(255,255,255,0.03)');
+  gradient.addColorStop(0.12, 'rgba(255,255,255,0.9)');
+  gradient.addColorStop(0.3, 'rgba(255,255,255,0.5)');
+  gradient.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+  gradient.addColorStop(0.7, 'rgba(255,255,255,0.03)');
   gradient.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
   return new THREE.CanvasTexture(canvas);
 }
 
-function pickColor(palette, i, time) {
-  const idx = i % palette.length;
-  const c = palette[idx];
-  const brightness = 0.6 + 0.4 * Math.sin(i * 0.05 + time * 0.7);
-  return [c[0] * brightness, c[1] * brightness, c[2] * brightness];
-}
-
-function lerpColor(a, b, t) {
-  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-}
-
 export function initParticles(canvas) {
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0a0a0f, 0.00015);
+  scene.fog = new THREE.FogExp2(0x0a0a0f, 0.0002);
 
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.z = 6;
@@ -83,31 +68,28 @@ export function initParticles(canvas) {
 
   geometry = new THREE.BufferGeometry();
   positions = new Float32Array(ParticleCount * 3);
-  basePositions = new Float32Array(ParticleCount * 3);
+  restPositions = new Float32Array(ParticleCount * 3);
   colors = new Float32Array(ParticleCount * 3);
   velocities = new Float32Array(ParticleCount * 3);
-  phases = new Float32Array(ParticleCount);
 
+  // Spread particles across the full visible volume
   for (let i = 0; i < ParticleCount; i++) {
     const i3 = i * 3;
-    // Spread across entire visible volume (wider than screen)
     const x = (Math.random() - 0.5) * 10;
     const y = (Math.random() - 0.5) * 7;
     const z = (Math.random() - 0.5) * 5;
     positions[i3] = x;
     positions[i3 + 1] = y;
     positions[i3 + 2] = z;
-    basePositions[i3] = x;
-    basePositions[i3 + 1] = y;
-    basePositions[i3 + 2] = z;
-    const c = pickColor(currentPalette, i, 0);
-    colors[i3] = c[0];
-    colors[i3 + 1] = c[1];
-    colors[i3 + 2] = c[2];
+    restPositions[i3] = x;
+    restPositions[i3 + 1] = y;
+    restPositions[i3 + 2] = z;
+    colors[i3] = 0.3;
+    colors[i3 + 1] = 0.4;
+    colors[i3 + 2] = 0.6;
     velocities[i3] = 0;
     velocities[i3 + 1] = 0;
     velocities[i3 + 2] = 0;
-    phases[i] = Math.random() * Math.PI * 2;
   }
 
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -120,7 +102,7 @@ export function initParticles(canvas) {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.85,
   });
 
   scene.add(new THREE.Points(geometry, material));
@@ -146,93 +128,128 @@ function animate() {
   const hasHand = conf > 0.7;
   const time = performance.now() * 0.001;
 
-  // Hand position in 3D space
+  // Map hand to 3D space
   cursorTarget.set(
-    (center.x - 0.5) * 10,
-    -(center.y - 0.5) * 7,
+    (center.x - 0.5) * 8,
+    -(center.y - 0.5) * 5.5,
     0
   );
-  prevCursor.copy(cursor3D);
-  cursor3D.lerp(cursorTarget, hasHand ? 0.12 : 0.03);
-  const handSpeed = prevCursor.distanceTo(cursor3D) / Math.max(dt, 0.001);
+  cursor3D.lerp(cursorTarget, 0.1);
 
-  // Palette transition
-  targetPalette = palettes[gesture] || palettes.open;
-  paletteLerp += (1.0 - paletteLerp) * 2.0 * dt;
-  if (paletteLerp > 0.99) {
-    currentPalette = targetPalette;
-    paletteLerp = 1.0;
-  }
+  const palette = palettes[gesture] || palettes.open;
+  const hx = cursor3D.x, hy = cursor3D.y, hz = cursor3D.z;
 
   for (let i = 0; i < particleCount; i++) {
     const i3 = i * 3;
     const px = positions[i3];
     const py = positions[i3 + 1];
     const pz = positions[i3 + 2];
-    const bx = basePositions[i3];
-    const by = basePositions[i3 + 1];
-    const bz = basePositions[i3 + 2];
 
-    // Distance from hand
-    const dx = px - cursor3D.x;
-    const dy = py - cursor3D.y;
-    const dz = pz - cursor3D.z;
-    const distToHand = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
-
-    // Base gentle floating motion (ambient drift)
-    const floatX = Math.sin(time * 0.3 + phases[i]) * 0.003;
-    const floatY = Math.cos(time * 0.4 + phases[i] * 1.3) * 0.003;
-    const floatZ = Math.sin(time * 0.35 + phases[i] * 0.7) * 0.002;
-
-    let fx = (bx - px) * 0.005 + floatX;
-    let fy = (by - py) * 0.005 + floatY;
-    let fz = (bz - pz) * 0.005 + floatZ;
+    // Distance to hand
+    const dx = px - hx;
+    const dy = py - hy;
+    const dz = pz - hz;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.001;
 
     if (hasHand) {
-      // Hand influence: ripple effect
-      const influenceRadius = 3.0 + handSpeed * 0.5;
-      if (distToHand < influenceRadius) {
-        const influence = 1.0 - distToHand / influenceRadius;
-        // Push particles outward from hand (ripple)
-        const pushForce = influence * influence * 0.08;
-        fx += (dx / distToHand) * pushForce;
-        fy += (dy / distToHand) * pushForce;
-        fz += (dz / distToHand) * pushForce * 0.5;
+      const attractRadius = 5.0;
+      const influence = dist < attractRadius ? 1.0 - dist / attractRadius : 0;
+      const strength = influence * influence;
 
-        // Tangential swirl
-        const swirlForce = influence * 0.025;
-        fx += -dz * swirlForce;
-        fz += dx * swirlForce;
+      // Gesture-specific target shape around hand
+      let tx = hx, ty = hy, tz = hz;
+
+      switch (gesture) {
+        case 'open': {
+          // Wide burst ring around hand
+          const ringR = 1.5 + strength * 2;
+          const ang = Math.atan2(py - hy, px - hx) + time * 0.5;
+          tx = hx + Math.cos(ang) * ringR;
+          ty = hy + Math.sin(ang) * ringR;
+          tz = hz + (pz - hz) * 0.3;
+          break;
+        }
+        case 'fist': {
+          // Dense cluster close to hand
+          const clusterR = 0.3 + strength * 0.8;
+          const ang = Math.atan2(py - hy, px - hx);
+          const vertAng = Math.atan2(Math.sqrt(dx * dx + dy * dy), dz);
+          tx = hx + Math.sin(vertAng) * Math.cos(ang) * clusterR;
+          ty = hy + Math.sin(vertAng) * Math.sin(ang) * clusterR;
+          tz = hz + Math.cos(vertAng) * clusterR;
+          break;
+        }
+        case 'pinch': {
+          // Flat spiral disk
+          const spiralR = 0.3 + strength * 3;
+          const ang = Math.atan2(py - hy, px - hx) + spiralR * 1.5 + time;
+          tx = hx + Math.cos(ang) * spiralR;
+          ty = hy + Math.sin(ang) * spiralR;
+          tz = hz + (pz - hz) * 0.1;
+          break;
+        }
+        case 'point': {
+          // Stream to the right (pointing direction)
+          const streamX = 0.3 + strength * 4;
+          tx = hx + streamX;
+          ty = hy + (pz * 0.5);
+          tz = hz + (py - hy) * 0.3;
+          break;
+        }
       }
+
+      // Strong pull toward target shape
+      const pull = strength * 0.06;
+      velocities[i3] += (tx - px) * pull;
+      velocities[i3 + 1] += (ty - py) * pull;
+      velocities[i3 + 2] += (tz - pz) * pull;
+
+      // Direct attraction to hand (stronger for close particles)
+      const attract = 0.03 / Math.max(dist, 0.1);
+      velocities[i3] -= dx * attract * strength;
+      velocities[i3 + 1] -= dy * attract * strength;
+      velocities[i3 + 2] -= dz * attract * strength;
+
+    } else {
+      // No hand: gentle return to rest positions
+      const rx = restPositions[i3];
+      const ry = restPositions[i3 + 1];
+      const rz = restPositions[i3 + 2];
+      const returnForce = 0.003;
+      velocities[i3] += (rx - px) * returnForce;
+      velocities[i3 + 1] += (ry - py) * returnForce;
+      velocities[i3 + 2] += (rz - pz) * returnForce;
+
+      // Gentle ambient drift
+      velocities[i3] += Math.sin(time * 0.4 + i * 0.003) * 0.0008;
+      velocities[i3 + 1] += Math.cos(time * 0.5 + i * 0.004) * 0.0008;
+      velocities[i3 + 2] += Math.sin(time * 0.35 + i * 0.005) * 0.0005;
     }
 
-    velocities[i3] += fx;
-    velocities[i3 + 1] += fy;
-    velocities[i3 + 2] += fz;
-
+    // Damping
     velocities[i3] *= Damping;
     velocities[i3 + 1] *= Damping;
     velocities[i3 + 2] *= Damping;
 
+    // Update position
     positions[i3] += velocities[i3];
     positions[i3 + 1] += velocities[i3 + 1];
     positions[i3 + 2] += velocities[i3 + 2];
 
-    // Color: blend between current and target palette, brightness from hand proximity
-    const lerpT = Math.min(paletteLerp, 1.0);
-    const tc = targetPalette[i % targetPalette.length];
-    const cc = currentPalette[i % currentPalette.length];
-    const blended = lerpColor(cc, tc, lerpT);
-
-    let brightness = 0.55 + 0.2 * Math.sin(phases[i] + time * 0.5);
-    if (hasHand && distToHand < 4.0) {
-      brightness += (1.0 - distToHand / 4.0) * 0.5;
+    // Color: palette based on gesture, brightness based on hand proximity
+    const ci = i % palette.length;
+    const c = palette[ci];
+    let bright;
+    if (hasHand) {
+      bright = 0.4 + (1.0 - Math.min(dist, 5.0) / 5.0) * 0.6;
+    } else {
+      bright = 0.3 + 0.15 * Math.sin(i * 0.04 + time * 0.6);
     }
-    brightness = Math.min(brightness, 1.0);
+    bright = Math.max(0.15, Math.min(bright, 1.0));
 
-    colors[i3] = blended[0] * brightness;
-    colors[i3 + 1] = blended[1] * brightness;
-    colors[i3 + 2] = blended[2] * brightness;
+    colors[i3] = c[0] * bright;
+    colors[i3 + 1] = c[1] * bright;
+    colors[i3 + 2] = c[2] * bright;
   }
 
   geometry.attributes.position.needsUpdate = true;
