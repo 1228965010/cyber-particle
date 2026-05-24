@@ -157,7 +157,7 @@ function animate() {
 
     if (hasHand) {
       // Pattern size: inverse of hand distance (close=small, far=large, clamped)
-      const patternScale = Math.max(0.4, Math.min(2.5, 1.2 / Math.max(handScale, 0.3)));
+      const patternScale = Math.max(0.4, Math.min(2.5, 1.2 / Math.max(speedMul, 0.3)));
       const influenceRadius = 4.5 * patternScale;
 
       switch (gesture) {
