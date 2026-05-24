@@ -62,13 +62,12 @@
 
     initParticles(canvas);
 
-    initGesture(video).catch((err) => {
-      console.error('Gesture init failed:', err);
+    initGesture(video).then(() => {
+      console.log('Gesture detection started successfully');
+    }).catch((err) => {
+      console.error('Gesture init failed:', err.message || err);
       if (err.name === 'NotAllowedError') {
         prompt.classList.remove('hidden');
-      } else {
-        const nameEl = document.getElementById('gesture-name');
-        if (nameEl) nameEl.innerHTML = 'ERROR: ' + (err.message || 'init failed').slice(0, 40);
       }
     });
 

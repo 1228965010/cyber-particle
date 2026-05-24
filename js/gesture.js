@@ -1,24 +1,26 @@
 // Cyber Particle — Gesture Detection via MediaPipe Hands
 // Uses @mediapipe/hands (stable callback-based API)
 
-const ConfidenceThreshold = 0.7;
 const DebounceMs = 250;
 const FingerTipIds = [4, 8, 12, 16, 20];
 const FingerMcpIds = [1, 5, 9, 13, 17];
 const MiddleMcpId = 9;
 
+let hands = null;
 let currentGesture = 'open';
 let lastSwitchTime = 0;
 let handCenter = { x: 0.5, y: 0.5 };
 let handConfidence = 0;
-let hands = null;
 let running = false;
 let cameraStream = null;
 let videoElement = null;
+let initError = null;
 
 export function getGesture() { return currentGesture; }
 export function getHandCenter() { return handCenter; }
 export function getConfidence() { return handConfidence; }
+export function getInitError() { return initError; }
+export function isRunning() { return running; }
 
 export async function initGesture(videoEl) {
   videoElement = videoEl;
@@ -36,7 +38,6 @@ export async function initGesture(videoEl) {
   });
 
   hands.onResults((results) => {
-    console.log('onResults fired, landmarks:', results.multiHandLandmarks?.length || 0);
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
       const lm = results.multiHandLandmarks[0];
       handConfidence =
@@ -57,6 +58,7 @@ export async function initGesture(videoEl) {
     videoEl.srcObject = cameraStream;
     await videoEl.play();
   } catch (err) {
+    initError = err;
     if (err.name === 'NotAllowedError') {
       document.getElementById('permission-prompt').classList.remove('hidden');
       document.getElementById('enable-camera').onclick = () => location.reload();
@@ -69,11 +71,8 @@ export async function initGesture(videoEl) {
   requestAnimationFrame(detectLoop);
 }
 
-let frameCount = 0;
 async function detectLoop() {
   if (!running || !videoElement) return;
-  frameCount++;
-  if (frameCount % 60 === 0) console.log('detectLoop frame:', frameCount, 'hands:', !!hands);
   if (videoElement.readyState >= 2) {
     await hands.send({ image: videoElement });
   }
