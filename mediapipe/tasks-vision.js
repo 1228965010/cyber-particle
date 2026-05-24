@@ -1,0 +1,1 @@
+Couldn't find the requested file /index.mjs in @mediapipe/tasks-vision.
