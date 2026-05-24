@@ -1,6 +1,6 @@
 // Cyber Particle — Gesture-Driven Particle Behaviors
 import * as THREE from 'three';
-import { getGesture, getHandCenter, getConfidence, getPointDirection } from './gesture.js';
+import { getGesture, getHandCenter, getConfidence, getPointDirection, getHandScale } from './gesture.js';
 
 const ParticleCount = 10000;
 const Damping = 0.94;
@@ -138,6 +138,7 @@ function animate() {
 
   const palette = palettes[gesture] || palettes.open;
   const hx = cursor3D.x, hy = cursor3D.y, hz = cursor3D.z;
+  const speedMul = getHandScale(); // hand closer = faster particles
 
   // Point direction
   const pd = getPointDirection();
@@ -172,16 +173,15 @@ function animate() {
             velocities[i3 + 2] = 0;
           } else if (dist < influenceRadius) {
             const depth = 1.0 - dist / influenceRadius;
-            const suck = 0.06 / (dist * dist + 0.05);
+            const suck = 0.06 / (dist * dist + 0.05) * speedMul;
             velocities[i3] -= (dx / dist) * suck;
             velocities[i3 + 1] -= (dy / dist) * suck;
             velocities[i3 + 2] -= (dz / dist) * suck * 0.4;
-            const swirl = 0.03 * depth * depth;
+            const swirl = 0.03 * depth * depth * speedMul;
             velocities[i3] += -dy * swirl;
             velocities[i3 + 1] += dx * swirl;
           } else {
-            // Gentle pull from anywhere on screen
-            const pull = 0.003;
+            const pull = 0.003 * speedMul;
             velocities[i3] -= (dx / dist) * pull;
             velocities[i3 + 1] -= (dy / dist) * pull;
           }
@@ -191,14 +191,12 @@ function animate() {
         case 'open':
           if (dist < influenceRadius) {
             const depth = 1.0 - dist / influenceRadius;
-            // Push particles outward
-            const burst = 0.04 * depth;
+            const burst = 0.04 * depth * speedMul;
             velocities[i3] += (dx / dist) * burst;
             velocities[i3 + 1] += (dy / dist) * burst;
             velocities[i3 + 2] += (dz / dist) * burst * 0.3;
-            // Add radial speed
-            velocities[i3] += dx * 0.002;
-            velocities[i3 + 1] += dy * 0.002;
+            velocities[i3] += dx * 0.002 * speedMul;
+            velocities[i3 + 1] += dy * 0.002 * speedMul;
           }
           break;
 
@@ -217,21 +215,21 @@ function animate() {
             const depth = 1.0 - dist / influenceRadius;
 
             // Pull particles toward the stream axis (perpendicular correction)
-            const axisPull = 0.02 * depth;
+            const axisPull = 0.02 * depth * speedMul;
             velocities[i3] -= perpX * perp * axisPull * 0.1;
             velocities[i3 + 1] -= perpY * perp * axisPull * 0.1;
 
             // Once near axis, accelerate along pointing direction
             const streamWidth = Math.abs(perp);
             if (streamWidth < 1.5) {
-              const streamForce = 0.03 * (1.0 - streamWidth / 1.5);
+              const streamForce = 0.03 * (1.0 - streamWidth / 1.5) * speedMul;
               velocities[i3] += ndx * streamForce;
               velocities[i3 + 1] += ndy * streamForce;
             }
 
             // Particles behind the hand get stronger push forward
             if (proj < 0) {
-              const push = 0.02 * depth;
+              const push = 0.02 * depth * speedMul;
               velocities[i3] += ndx * push;
               velocities[i3 + 1] += ndy * push;
             }
@@ -252,22 +250,21 @@ function animate() {
             velocities[i3 + 2] = 0;
           } else if (dist < influenceRadius) {
             const depth = 1.0 - dist / influenceRadius;
-            const pull = 0.04 * depth;
+            const pull = 0.04 * depth * speedMul;
             velocities[i3] -= (dx / dist) * pull;
             velocities[i3 + 1] -= (dy / dist) * pull;
             velocities[i3 + 2] -= (dz / dist) * pull * 0.4;
             const ringRadius = 0.6;
             if (dist < ringRadius * 1.5) {
-              const orbitForce = 0.02;
+              const orbitForce = 0.02 * speedMul;
               velocities[i3] += -dy * orbitForce;
               velocities[i3 + 1] += dx * orbitForce;
-              const radialCorr = (dist - ringRadius) * 0.03;
+              const radialCorr = (dist - ringRadius) * 0.03 * speedMul;
               velocities[i3] -= (dx / dist) * radialCorr;
               velocities[i3 + 1] -= (dy / dist) * radialCorr;
             }
           } else {
-            // Gentle pull from anywhere
-            const pull = 0.003;
+            const pull = 0.003 * speedMul;
             velocities[i3] -= (dx / dist) * pull;
             velocities[i3 + 1] -= (dy / dist) * pull;
           }

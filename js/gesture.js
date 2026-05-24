@@ -15,10 +15,13 @@ let pointDir = { x: 1, y: 0 };
 let isActive = false;
 let videoEl = null;
 
+let handScale = 1.0;
+
 export function getGesture() { return currentGesture; }
 export function getHandCenter() { return handCenter; }
 export function getConfidence() { return handConfidence; }
 export function getPointDirection() { return pointDir; }
+export function getHandScale() { return handScale; }
 export function isRunning() { return isActive; }
 
 export async function initGesture(videoElement) {
@@ -79,6 +82,10 @@ export async function initGesture(videoElement) {
             ? results.handednesses[0][0].score
             : 0.9;
         handCenter = { x: lm[MiddleMcpId].x, y: lm[MiddleMcpId].y };
+        // Hand scale: wrist-to-middle-MCP distance (closer hand = larger)
+        const wrist = lm[0], midMcp = lm[9];
+        const rawScale = Math.hypot(midMcp.x - wrist.x, midMcp.y - wrist.y);
+        handScale = Math.max(0.3, Math.min(2.5, rawScale / 0.12));
         // Point direction: index tip - index mcp
         const tip8 = lm[8], mcp5 = lm[5];
         pointDir = { x: tip8.x - mcp5.x, y: tip8.y - mcp5.y };
