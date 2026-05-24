@@ -1,5 +1,5 @@
 // Cyber Particle — HUD display manager
-import { getGesture, getConfidence } from './gesture.js';
+import { getGesture, getConfidence, isRunning } from './gesture.js';
 
 const gestureNames = {
   open: 'NEBULA',
@@ -24,13 +24,23 @@ export class HudManager {
 
     document.getElementById('fps-display').textContent = `FPS: ${fpsDisplay}`;
 
-    const gesture = getGesture();
     const nameEl = document.getElementById('gesture-name');
+
+    if (!isRunning()) {
+      nameEl.innerHTML = `LOADING<span class="cursor">_</span>`;
+      document.getElementById('confidence-display').textContent = 'CONF: --';
+      document.querySelectorAll('.bar-segment').forEach(seg => {
+        seg.classList.remove('active');
+      });
+      return;
+    }
+
+    const gesture = getGesture();
     nameEl.innerHTML = `${gestureNames[gesture] || '--'}<span class="cursor">_</span>`;
 
     const conf = getConfidence();
     document.getElementById('confidence-display').textContent =
-      `CONF: ${(conf * 100).toFixed(0)}%`;
+      `CONF: ${Math.round(conf * 100)}%`;
 
     document.querySelectorAll('.bar-segment').forEach(seg => {
       seg.classList.toggle('active', seg.dataset.gesture === gesture);
