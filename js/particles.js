@@ -152,63 +152,68 @@ function animate() {
     const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.001;
 
     if (hasHand) {
-      const attractRadius = 5.0;
-      const influence = dist < attractRadius ? 1.0 - dist / attractRadius : 0;
-      const strength = influence * influence;
+      const innerRadius = 0.5;   // repulsion zone
+      const midRadius = 1.5;     // orbit zone
+      const outerRadius = 3.0;   // attraction zone
 
-      // Gesture-specific target shape around hand
-      let tx = hx, ty = hy, tz = hz;
+      let fx = 0, fy = 0, fz = 0;
 
-      switch (gesture) {
-        case 'open': {
-          // Wide burst ring around hand
-          const ringR = 1.5 + strength * 2;
-          const ang = Math.atan2(py - hy, px - hx) + time * 0.5;
-          tx = hx + Math.cos(ang) * ringR;
-          ty = hy + Math.sin(ang) * ringR;
-          tz = hz + (pz - hz) * 0.3;
-          break;
-        }
-        case 'fist': {
-          // Dense cluster close to hand
-          const clusterR = 0.3 + strength * 0.8;
-          const ang = Math.atan2(py - hy, px - hx);
-          const vertAng = Math.atan2(Math.sqrt(dx * dx + dy * dy), dz);
-          tx = hx + Math.sin(vertAng) * Math.cos(ang) * clusterR;
-          ty = hy + Math.sin(vertAng) * Math.sin(ang) * clusterR;
-          tz = hz + Math.cos(vertAng) * clusterR;
-          break;
-        }
-        case 'pinch': {
-          // Flat spiral disk
-          const spiralR = 0.3 + strength * 3;
-          const ang = Math.atan2(py - hy, px - hx) + spiralR * 1.5 + time;
-          tx = hx + Math.cos(ang) * spiralR;
-          ty = hy + Math.sin(ang) * spiralR;
-          tz = hz + (pz - hz) * 0.1;
-          break;
-        }
-        case 'point': {
-          // Stream to the right (pointing direction)
-          const streamX = 0.3 + strength * 4;
-          tx = hx + streamX;
-          ty = hy + (pz * 0.5);
-          tz = hz + (py - hy) * 0.3;
-          break;
-        }
+      if (dist < innerRadius) {
+        // Too close: push away
+        const repel = (innerRadius - dist) / innerRadius;
+        const force = repel * 0.08;
+        fx += (dx / dist) * force;
+        fy += (dy / dist) * force;
+        fz += (dz / dist) * force * 0.3;
+      } else if (dist < midRadius) {
+        // Sweet spot: gentle orbit
+        const orbit = (dist - innerRadius) / (midRadius - innerRadius);
+        const force = orbit * 0.015;
+        fx += -dy * force;
+        fy += dx * force;
+        fz += (pz - hz) * -0.005;
+      } else if (dist < outerRadius) {
+        // Far: pull toward hand
+        const attract = (outerRadius - dist) / (outerRadius - midRadius);
+        const force = attract * 0.02;
+        fx -= (dx / dist) * force;
+        fy -= (dy / dist) * force;
+        fz -= (dz / dist) * force * 0.3;
       }
 
-      // Strong pull toward target shape
-      const pull = strength * 0.06;
-      velocities[i3] += (tx - px) * pull;
-      velocities[i3 + 1] += (ty - py) * pull;
-      velocities[i3 + 2] += (tz - pz) * pull;
+      // Gesture-specific shaping (applied on top of force field)
+      switch (gesture) {
+        case 'open':
+          // Spread particles more on XY plane
+          fx += dx * 0.002;
+          fy += dy * 0.002;
+          break;
+        case 'fist':
+          // Pull particles tighter
+          if (dist < outerRadius) {
+            fx -= dx * 0.004;
+            fy -= dy * 0.004;
+            fz -= dz * 0.004;
+          }
+          break;
+        case 'pinch':
+          // Swirl around hand
+          if (dist < midRadius) {
+            fx += -dz * 0.01;
+            fz += dx * 0.01;
+          }
+          break;
+        case 'point':
+          // Push particles to the right
+          if (dist < outerRadius) {
+            fx += 0.005;
+          }
+          break;
+      }
 
-      // Direct attraction to hand (stronger for close particles)
-      const attract = 0.03 / Math.max(dist, 0.1);
-      velocities[i3] -= dx * attract * strength;
-      velocities[i3 + 1] -= dy * attract * strength;
-      velocities[i3 + 2] -= dz * attract * strength;
+      velocities[i3] += fx;
+      velocities[i3 + 1] += fy;
+      velocities[i3 + 2] += fz;
 
     } else {
       // No hand: gentle return to rest positions
