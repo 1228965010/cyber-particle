@@ -20,7 +20,7 @@ if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) {
 }
 
 let scene, camera, renderer, geometry;
-let positions, colors, velocities;
+let positions, colors, velocities, restPositions;
 let clock = new THREE.Clock();
 let animating = true;
 let handleResize;
@@ -68,6 +68,7 @@ export function initParticles(canvas) {
 
   geometry = new THREE.BufferGeometry();
   positions = new Float32Array(ParticleCount * 3);
+  restPositions = new Float32Array(ParticleCount * 3);
   colors = new Float32Array(ParticleCount * 3);
   velocities = new Float32Array(ParticleCount * 3);
 
@@ -82,6 +83,9 @@ export function initParticles(canvas) {
     positions[i3] = x;
     positions[i3 + 1] = y;
     positions[i3 + 2] = z;
+    restPositions[i3] = x;
+    restPositions[i3 + 1] = y;
+    restPositions[i3 + 2] = z;
     colors[i3] = 0.3;
     colors[i3 + 1] = 0.4;
     colors[i3 + 2] = 0.6;
@@ -175,14 +179,14 @@ function animate() {
       // How deep in the vortex (1 at core, 0 at edge)
       const depth = 1.0 - dist / vortexRadius;
 
-      // Suck inward: strong constant pull toward center
-      const suck = suckStrength * (0.3 + depth * 0.7);
+      // Suck inward: 1/dist^2 scaling → much stronger near hand
+      const suck = suckStrength / (dist * dist + 0.05);
       velocities[i3] -= (dx / dist) * suck;
       velocities[i3 + 1] -= (dy / dist) * suck;
       velocities[i3 + 2] -= (dz / dist) * suck * 0.3;
 
       // Swirl: spin around center (faster when closer)
-      const swirl = swirlStrength * depth;
+      const swirl = swirlStrength * depth * depth;
       velocities[i3] += -dy * swirl;
       velocities[i3 + 1] += dx * swirl;
 
@@ -210,10 +214,17 @@ function animate() {
       }
 
     } else {
-      // No hand / outside vortex: gentle drift
-      velocities[i3] += Math.sin(time * 0.4 + px * 0.3) * 0.0005;
-      velocities[i3 + 1] += Math.cos(time * 0.5 + py * 0.3) * 0.0005;
-      velocities[i3 + 2] += Math.sin(time * 0.35 + pz * 0.3) * 0.0003;
+      // No hand: return to rest positions
+      const rx = restPositions[i3];
+      const ry = restPositions[i3 + 1];
+      const rz = restPositions[i3 + 2];
+      const rdx = rx - px;
+      const rdy = ry - py;
+      const rdz = rz - pz;
+      const returnForce = 0.005;
+      velocities[i3] += rdx * returnForce;
+      velocities[i3 + 1] += rdy * returnForce;
+      velocities[i3 + 2] += rdz * returnForce;
     }
 
     // Damping
