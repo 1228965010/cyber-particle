@@ -156,7 +156,9 @@ function animate() {
     const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.001;
 
     if (hasHand) {
-      const influenceRadius = 4.5;
+      // Pattern size: inverse of hand distance (close=small, far=large, clamped)
+      const patternScale = Math.max(0.4, Math.min(2.5, 1.2 / Math.max(handScale, 0.3)));
+      const influenceRadius = 4.5 * patternScale;
 
       switch (gesture) {
         // ===== 1. FIST: converge + vortex =====
@@ -244,9 +246,9 @@ function animate() {
           const st = Math.sin(t), ct = Math.cos(t);
           const hx0 = 16 * st * st * st;
           const hy0 = 13 * ct - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-          const heartScale = 0.045;
+          const heartScale = 0.045 * patternScale;
           const heartX = hx + hx0 * heartScale;
-          const heartY = hy + hy0 * heartScale; // flip Y for screen coords
+          const heartY = hy + hy0 * heartScale;
           const heartZ = hz + (pz - hz) * 0.1 + Math.sin(t * 3) * 0.15;
 
           if (dist < influenceRadius) {
