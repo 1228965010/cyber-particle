@@ -32,6 +32,7 @@ export async function initGesture(videoEl) {
   });
 
   let resultCount = 0;
+  let frameCount = 0;
   hands.onResults((results) => {
     resultCount++;
     if (resultCount <= 3 || resultCount % 60 === 0) {
@@ -52,7 +53,14 @@ export async function initGesture(videoEl) {
 
   camera = new Camera(videoEl, {
     onFrame: async () => {
+      frameCount++;
+      if (frameCount <= 3 || frameCount % 60 === 0) {
+        console.log(`onFrame #${frameCount}, calling hands.send...`);
+      }
       await hands.send({ image: videoEl });
+      if (frameCount <= 3) {
+        console.log(`onFrame #${frameCount}, hands.send completed`);
+      }
     },
     width: 1280,
     height: 720,
