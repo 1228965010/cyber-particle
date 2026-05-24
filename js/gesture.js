@@ -1,23 +1,17 @@
 // Cyber Particle — Gesture Detection via MediaPipe Hands
-// Uses @mediapipe/tasks-vision HandLandmarker
-
-import { HudManager } from './hud.js';
+// Uses @mediapipe/hands (stable callback-based API)
 
 const ConfidenceThreshold = 0.7;
 const DebounceMs = 250;
 const FingerTipIds = [4, 8, 12, 16, 20];
-const FingerPipIds = [2, 6, 10, 14, 18];
 const FingerMcpIds = [1, 5, 9, 13, 17];
-const WristId = 0;
 const MiddleMcpId = 9;
 
-let handLandmarker = null;
 let currentGesture = 'open';
 let lastSwitchTime = 0;
 let handCenter = { x: 0.5, y: 0.5 };
 let handConfidence = 0;
 let running = false;
-let lastVideoTime = -1;
 let cameraStream = null;
 let videoElement = null;
 
@@ -26,23 +20,32 @@ export function getHandCenter() { return handCenter; }
 export function getConfidence() { return handConfidence; }
 
 export async function initGesture(videoEl) {
-  const { HandLandmarker, FilesetResolver } = await import(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21'
-  );
+  videoElement = videoEl;
 
-  const vision = await FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm'
-  );
+  const hands = new Hands({
+    locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
+  });
 
-  handLandmarker = await HandLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-      delegate: 'GPU',
-    },
-    runningMode: 'VIDEO',
-    numHands: 1,
-    minHandDetectionConfidence: ConfidenceThreshold,
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.7,
     minTrackingConfidence: 0.5,
+  });
+
+  hands.onResults((results) => {
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      const lm = results.multiHandLandmarks[0];
+      handConfidence =
+        results.multiHandedness && results.multiHandedness.length > 0
+          ? results.multiHandedness[0].score
+          : 0.9;
+      handCenter = { x: lm[MiddleMcpId].x, y: lm[MiddleMcpId].y };
+      classifyGesture(lm);
+    } else {
+      handConfidence = 0;
+    }
   });
 
   try {
@@ -50,7 +53,6 @@ export async function initGesture(videoEl) {
       video: { width: 1280, height: 720, facingMode: 'user' },
     });
     videoEl.srcObject = cameraStream;
-    videoElement = videoEl;
     await videoEl.play();
   } catch (err) {
     if (err.name === 'NotAllowedError') {
@@ -65,36 +67,12 @@ export async function initGesture(videoEl) {
   requestAnimationFrame(detectLoop);
 }
 
-function detectLoop() {
+async function detectLoop() {
   if (!running || !videoElement) return;
-  const video = videoElement;
-
-  if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
-    lastVideoTime = video.currentTime;
-    try {
-      const results = handLandmarker.detectForVideo(video, performance.now());
-      processResults(results);
-    } catch (e) {
-      console.warn('Detection frame error:', e);
-    }
+  if (videoElement.readyState >= 2) {
+    await hands.send({ image: videoElement });
   }
-
   requestAnimationFrame(detectLoop);
-}
-
-function processResults(results) {
-  if (results.landmarks && results.landmarks.length > 0) {
-    const lm = results.landmarks[0];
-    if (results.handednesses && results.handednesses.length > 0 && results.handednesses[0].length > 0) {
-      handConfidence = results.handednesses[0][0].score;
-    } else {
-      handConfidence = 0.8; // fallback if handedness not available
-    }
-    handCenter = { x: lm[MiddleMcpId].x, y: lm[MiddleMcpId].y };
-    classifyGesture(lm);
-  } else {
-    handConfidence = 0;
-  }
 }
 
 function classifyGesture(lm) {
@@ -122,7 +100,7 @@ function classifyGesture(lm) {
     gesture = 'point';
   } else if (fingersExtended.every(Boolean)) {
     gesture = 'open';
-  } else if (fingersExtended.every(f => !f)) {
+  } else if (fingersExtended.every((f) => !f)) {
     gesture = 'fist';
   }
 
@@ -135,9 +113,6 @@ function classifyGesture(lm) {
 export function stopGesture() {
   running = false;
   if (cameraStream) {
-    cameraStream.getTracks().forEach(t => t.stop());
-  }
-  if (handLandmarker) {
-    handLandmarker.close();
+    cameraStream.getTracks().forEach((t) => t.stop());
   }
 }
