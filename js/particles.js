@@ -246,7 +246,7 @@ function animate() {
           const hy0 = 13 * ct - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
           const heartScale = 0.045;
           const heartX = hx + hx0 * heartScale;
-          const heartY = hy - hy0 * heartScale; // flip Y for screen coords
+          const heartY = hy + hy0 * heartScale; // flip Y for screen coords
           const heartZ = hz + (pz - hz) * 0.1 + Math.sin(t * 3) * 0.15;
 
           if (dist < influenceRadius) {
