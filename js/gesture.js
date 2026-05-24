@@ -1,76 +1,91 @@
-// Cyber Particle — Gesture Detection via MediaPipe Hands
-// Pattern verified against working reference projects (GestureScape, Interactive-3D-Particle-System)
+// Cyber Particle — Gesture Detection via MediaPipe HandLandmarker
+// Uses IMAGE mode to avoid VIDEO mode's IMAGE_DIMENSIONS issues
 
 const DebounceMs = 250;
 const FingerTipIds = [4, 8, 12, 16, 20];
 const FingerMcpIds = [1, 5, 9, 13, 17];
 const MiddleMcpId = 9;
 
+let handLandmarker = null;
 let currentGesture = 'open';
 let lastSwitchTime = 0;
 let handCenter = { x: 0.5, y: 0.5 };
 let handConfidence = 0;
 let isActive = false;
+let videoEl = null;
 
 export function getGesture() { return currentGesture; }
 export function getHandCenter() { return handCenter; }
 export function getConfidence() { return handConfidence; }
 export function isRunning() { return isActive; }
 
-export function initGesture(videoEl) {
-  return new Promise((resolve, reject) => {
-    const hands = new Hands({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-    });
+export async function initGesture(videoElement) {
+  videoEl = videoElement;
 
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.5,
-    });
+  const { HandLandmarker, FilesetResolver } = await import(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21'
+  );
 
-    hands.onResults((results) => {
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const lm = results.multiHandLandmarks[0];
+  const vision = await FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm'
+  );
+
+  handLandmarker = await HandLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath:
+        'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+      delegate: 'GPU',
+    },
+    runningMode: 'IMAGE',
+    numHands: 1,
+    minHandDetectionConfidence: 0.7,
+    minTrackingConfidence: 0.5,
+  });
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 1280, height: 720, facingMode: 'user' },
+    });
+    videoEl.srcObject = stream;
+    await videoEl.play();
+  } catch (err) {
+    if (err.name === 'NotAllowedError') {
+      document.getElementById('permission-prompt').classList.remove('hidden');
+      document.getElementById('enable-camera').onclick = () => location.reload();
+      return;
+    }
+    throw err;
+  }
+
+  // Offscreen canvas for frame capture
+  const captureCanvas = document.createElement('canvas');
+  captureCanvas.width = 1280;
+  captureCanvas.height = 720;
+  const ctx = captureCanvas.getContext('2d');
+
+  isActive = true;
+  console.log('Gesture detection active (IMAGE mode)');
+
+  async function tick() {
+    if (!isActive) return;
+    if (videoEl.readyState >= 2) {
+      ctx.drawImage(videoEl, 0, 0, 1280, 720);
+      const results = handLandmarker.detect(captureCanvas);
+      if (results.landmarks && results.landmarks.length > 0) {
+        const lm = results.landmarks[0];
         handConfidence =
-          results.multiHandedness && results.multiHandedness.length > 0
-            ? results.multiHandedness[0].score
+          results.handednesses && results.handednesses.length > 0 && results.handednesses[0].length > 0
+            ? results.handednesses[0][0].score
             : 0.9;
         handCenter = { x: lm[MiddleMcpId].x, y: lm[MiddleMcpId].y };
         classifyGesture(lm);
       } else {
         handConfidence = 0;
       }
-    });
-
-    navigator.mediaDevices
-      .getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' } })
-      .then((stream) => {
-        videoEl.srcObject = stream;
-        videoEl.play();
-        isActive = true;
-        console.log('Camera active, starting detection loop');
-        resolve();
-        requestAnimationFrame(tick);
-      })
-      .catch((err) => {
-        if (err.name === 'NotAllowedError') {
-          document.getElementById('permission-prompt').classList.remove('hidden');
-          document.getElementById('enable-camera').onclick = () => location.reload();
-          reject(err);
-        } else {
-          reject(err);
-        }
-      });
-
-    async function tick() {
-      if (!isActive) return;
-      await hands.send({ image: videoEl });
-      requestAnimationFrame(tick);
     }
-  });
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
 
 function classifyGesture(lm) {
@@ -110,4 +125,8 @@ function classifyGesture(lm) {
 
 export function stopGesture() {
   isActive = false;
+  if (handLandmarker) {
+    handLandmarker.close();
+    handLandmarker = null;
+  }
 }
