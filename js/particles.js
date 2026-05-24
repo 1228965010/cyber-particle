@@ -239,21 +239,27 @@ function animate() {
           break;
         }
 
-        // ===== 4. PINCH: converge into heart shape =====
+        // ===== 4. PINCH: pulsing heart =====
         case 'pinch': {
-          // Heart parametric: each particle mapped to a point on the heart
+          // Heartbeat pulsation (0.85-1.15 range, ~2 beats/sec)
+          const beat = 1.0 + Math.sin(time * 6) * 0.08 + Math.sin(time * 12) * 0.05;
+          // Per-particle random wobble seed (deterministic from index)
+          const jitterX = ((i * 2654435761) % 1000) / 1000 - 0.5;
+          const jitterY = ((i * 1597334677) % 1000) / 1000 - 0.5;
+
+          // Heart parametric
           const t = (i / particleCount) * Math.PI * 2;
           const st = Math.sin(t), ct = Math.cos(t);
           const hx0 = 16 * st * st * st;
           const hy0 = 13 * ct - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-          const heartScale = 0.045 * patternScale;
-          const heartX = hx + hx0 * heartScale;
-          const heartY = hy + hy0 * heartScale;
-          const heartZ = hz + (pz - hz) * 0.1 + Math.sin(t * 3) * 0.15;
+          const heartScale = 0.045 * patternScale * beat;
+          const heartX = hx + hx0 * heartScale + jitterX * 0.06 * speedMul;
+          const heartY = hy + hy0 * heartScale + jitterY * 0.06 * speedMul;
+          // Z depth: spread particles in a thin volume, not a line
+          const heartZ = hz + Math.sin(t * 3 + jitterX * 2) * 0.25 * patternScale;
 
           if (dist < influenceRadius) {
             const depth = 1.0 - dist / influenceRadius;
-            // Pull toward heart target position
             const pull = 0.05 * depth * speedMul;
             velocities[i3] += (heartX - px) * pull;
             velocities[i3 + 1] += (heartY - py) * pull;
