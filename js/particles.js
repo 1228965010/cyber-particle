@@ -1,9 +1,9 @@
-// Cyber Particle — Vortex Particle System
+// Cyber Particle — Gesture-Driven Particle Behaviors
 import * as THREE from 'three';
-import { getGesture, getHandCenter, getConfidence } from './gesture.js';
+import { getGesture, getHandCenter, getConfidence, getPointDirection } from './gesture.js';
 
 const ParticleCount = 10000;
-const Damping = 0.96;
+const Damping = 0.94;
 
 let particleCount = ParticleCount;
 const LowCount = 4000;
@@ -72,14 +72,13 @@ export function initParticles(canvas) {
   colors = new Float32Array(ParticleCount * 3);
   velocities = new Float32Array(ParticleCount * 3);
 
-  // Initialize particles in a large disk/ring
   for (let i = 0; i < ParticleCount; i++) {
     const i3 = i * 3;
     const angle = Math.random() * Math.PI * 2;
-    const radius = 0.3 + Math.random() * 5;
+    const radius = 0.5 + Math.random() * 5;
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
-    const z = (Math.random() - 0.5) * 2;
+    const z = (Math.random() - 0.5) * 3;
     positions[i3] = x;
     positions[i3 + 1] = y;
     positions[i3 + 2] = z;
@@ -119,18 +118,6 @@ export function initParticles(canvas) {
   animate();
 }
 
-function respawnParticle(i3, cx, cy, cz) {
-  // Respawn at outer edge of vortex
-  const angle = Math.random() * Math.PI * 2;
-  const radius = 2.5 + Math.random() * 1.0;
-  positions[i3] = cx + Math.cos(angle) * radius;
-  positions[i3 + 1] = cy + Math.sin(angle) * radius;
-  positions[i3 + 2] = cz + (Math.random() - 0.5) * 1.5;
-  velocities[i3] = 0;
-  velocities[i3 + 1] = 0;
-  velocities[i3 + 2] = 0;
-}
-
 function animate() {
   if (!animating) return;
   requestAnimationFrame(animate);
@@ -152,11 +139,9 @@ function animate() {
   const palette = palettes[gesture] || palettes.open;
   const hx = cursor3D.x, hy = cursor3D.y, hz = cursor3D.z;
 
-  // Vortex parameters
-  const suckStrength = 0.08;       // inward pull (strong)
-  const swirlStrength = 0.015;     // tangential spin (gentler than suck)
-  const coreRadius = 0.25;         // particles inside this get respawned
-  const vortexRadius = 3.5;        // max vortex reach (visible area only)
+  // Point direction
+  const pd = getPointDirection();
+  const pdx = pd.x, pdy = -pd.y; // flip Y to match 3D space
 
   for (let i = 0; i < particleCount; i++) {
     const i3 = i * 3;
@@ -169,47 +154,91 @@ function animate() {
     const dz = pz - hz;
     const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.001;
 
-    if (hasHand && dist < vortexRadius) {
-      // Respawn particles that reach the core
-      if (dist < coreRadius) {
-        respawnParticle(i3, hx, hy, hz);
-        continue;
-      }
+    if (hasHand) {
+      const influenceRadius = 4.5;
 
-      // How deep in the vortex (1 at core, 0 at edge)
-      const depth = 1.0 - dist / vortexRadius;
-
-      // Suck inward: 1/dist^2 scaling → much stronger near hand
-      const suck = suckStrength / (dist * dist + 0.05);
-      velocities[i3] -= (dx / dist) * suck;
-      velocities[i3 + 1] -= (dy / dist) * suck;
-      velocities[i3 + 2] -= (dz / dist) * suck * 0.3;
-
-      // Swirl: spin around center (faster when closer)
-      const swirl = swirlStrength * depth * depth;
-      velocities[i3] += -dy * swirl;
-      velocities[i3 + 1] += dx * swirl;
-
-      // Gesture modulation
       switch (gesture) {
-        case 'open':
-          // Slower, wider
-          velocities[i3] *= 0.95;
-          velocities[i3 + 1] *= 0.95;
-          break;
+        // ===== 1. FIST: converge + vortex =====
         case 'fist':
-          // Extra suction
-          velocities[i3] -= (dx / dist) * suck * 0.5;
-          velocities[i3 + 1] -= (dy / dist) * suck * 0.5;
+          if (dist < influenceRadius) {
+            const depth = 1.0 - dist / influenceRadius;
+            // Strong suction toward center
+            const suck = 0.06 / (dist * dist + 0.05);
+            velocities[i3] -= (dx / dist) * suck;
+            velocities[i3 + 1] -= (dy / dist) * suck;
+            velocities[i3 + 2] -= (dz / dist) * suck * 0.4;
+            // Spiral faster when closer
+            const swirl = 0.03 * depth * depth;
+            velocities[i3] += -dy * swirl;
+            velocities[i3 + 1] += dx * swirl;
+            // Respawn particles that reach the core
+            if (dist < 0.2) {
+              const a = Math.random() * Math.PI * 2;
+              const r = 2.5 + Math.random();
+              positions[i3] = hx + Math.cos(a) * r;
+              positions[i3 + 1] = hy + Math.sin(a) * r;
+              positions[i3 + 2] = hz + (Math.random() - 0.5) * 1.5;
+              velocities[i3] = 0;
+              velocities[i3 + 1] = 0;
+              velocities[i3 + 2] = 0;
+            }
+          }
           break;
+
+        // ===== 2. OPEN: burst outward from center =====
+        case 'open':
+          if (dist < influenceRadius) {
+            const depth = 1.0 - dist / influenceRadius;
+            // Push particles outward
+            const burst = 0.04 * depth;
+            velocities[i3] += (dx / dist) * burst;
+            velocities[i3 + 1] += (dy / dist) * burst;
+            velocities[i3 + 2] += (dz / dist) * burst * 0.3;
+            // Add radial speed
+            velocities[i3] += dx * 0.002;
+            velocities[i3 + 1] += dy * 0.002;
+          }
+          break;
+
+        // ===== 3. POINT: stream in pointing direction =====
+        case 'point': {
+          const dirLen = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
+          const ndx = pdx / dirLen, ndy = pdy / dirLen;
+          if (dist < influenceRadius) {
+            // Push particles in pointing direction
+            const stream = 0.05;
+            velocities[i3] += ndx * stream;
+            velocities[i3 + 1] += ndy * stream;
+            // Spread perpendicular to direction
+            const perpX = -ndy, perpY = ndx;
+            velocities[i3] += perpX * (pz * 0.01);
+            velocities[i3 + 1] += perpY * (pz * 0.01);
+          }
+          break;
+        }
+
+        // ===== 4. PINCH: converge into small circle =====
         case 'pinch':
-          // Extra swirl
-          velocities[i3] += -dy * swirl * 0.8;
-          velocities[i3 + 1] += dx * swirl * 0.8;
-          break;
-        case 'point':
-          // Pull rightward
-          velocities[i3] += 0.005;
+          if (dist < influenceRadius) {
+            const depth = 1.0 - dist / influenceRadius;
+            // Pull toward hand
+            const pull = 0.04 * depth;
+            velocities[i3] -= (dx / dist) * pull;
+            velocities[i3 + 1] -= (dy / dist) * pull;
+            velocities[i3 + 2] -= (dz / dist) * pull * 0.4;
+            // Orbit at a specific radius to form a ring
+            const ringRadius = 0.6;
+            if (dist < ringRadius * 1.5) {
+              // Tangential force to maintain orbit
+              const orbitForce = 0.02;
+              velocities[i3] += -dy * orbitForce;
+              velocities[i3 + 1] += dx * orbitForce;
+              // Radial correction: push to ring radius
+              const radialCorr = (dist - ringRadius) * 0.03;
+              velocities[i3] -= (dx / dist) * radialCorr;
+              velocities[i3 + 1] -= (dy / dist) * radialCorr;
+            }
+          }
           break;
       }
 
@@ -218,13 +247,9 @@ function animate() {
       const rx = restPositions[i3];
       const ry = restPositions[i3 + 1];
       const rz = restPositions[i3 + 2];
-      const rdx = rx - px;
-      const rdy = ry - py;
-      const rdz = rz - pz;
-      const returnForce = 0.005;
-      velocities[i3] += rdx * returnForce;
-      velocities[i3 + 1] += rdy * returnForce;
-      velocities[i3 + 2] += rdz * returnForce;
+      velocities[i3] += (rx - px) * 0.005;
+      velocities[i3 + 1] += (ry - py) * 0.005;
+      velocities[i3 + 2] += (rz - pz) * 0.005;
     }
 
     // Damping
@@ -232,22 +257,23 @@ function animate() {
     velocities[i3 + 1] *= Damping;
     velocities[i3 + 2] *= Damping;
 
-    // Update
     positions[i3] += velocities[i3];
     positions[i3 + 1] += velocities[i3 + 1];
     positions[i3 + 2] += velocities[i3 + 2];
 
-    // Color: brightness based on distance to hand center
+    // Color
     const ci = i % palette.length;
     const c = palette[ci];
+    const nowDist = Math.sqrt(
+      (positions[i3] - hx) ** 2 + (positions[i3 + 1] - hy) ** 2 + (positions[i3 + 2] - hz) ** 2
+    );
     let bright;
-    if (hasHand && dist < vortexRadius) {
-      bright = 0.4 + (1.0 - Math.min(dist, vortexRadius) / vortexRadius) * 0.6;
+    if (hasHand && nowDist < 4.5) {
+      bright = 0.4 + (1.0 - Math.min(nowDist, 4.5) / 4.5) * 0.6;
     } else {
-      bright = 0.25 + 0.1 * Math.sin(i * 0.03 + time * 0.5);
+      bright = 0.3 + 0.1 * Math.sin(i * 0.03 + time * 0.5);
     }
     bright = Math.max(0.1, Math.min(bright, 1.0));
-
     colors[i3] = c[0] * bright;
     colors[i3 + 1] = c[1] * bright;
     colors[i3 + 2] = c[2] * bright;

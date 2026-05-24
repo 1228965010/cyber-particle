@@ -11,12 +11,14 @@ let currentGesture = 'open';
 let lastSwitchTime = 0;
 let handCenter = { x: 0.5, y: 0.5 };
 let handConfidence = 0;
+let pointDir = { x: 1, y: 0 };
 let isActive = false;
 let videoEl = null;
 
 export function getGesture() { return currentGesture; }
 export function getHandCenter() { return handCenter; }
 export function getConfidence() { return handConfidence; }
+export function getPointDirection() { return pointDir; }
 export function isRunning() { return isActive; }
 
 export async function initGesture(videoElement) {
@@ -78,6 +80,9 @@ export async function initGesture(videoElement) {
             ? results.handednesses[0][0].score
             : 0.9;
         handCenter = { x: lm[MiddleMcpId].x, y: lm[MiddleMcpId].y };
+        // Point direction: index tip - index mcp
+        const tip8 = lm[8], mcp5 = lm[5];
+        pointDir = { x: tip8.x - mcp5.x, y: tip8.y - mcp5.y };
         classifyGesture(lm);
       } else {
         handConfidence = 0;
