@@ -25,11 +25,11 @@ export async function initGesture(videoElement) {
   videoEl = videoElement;
 
   const { HandLandmarker, FilesetResolver } = await import(
-    '/mediapipe/tasks-vision.mjs'
+    '/node_modules/@mediapipe/tasks-vision/vision_bundle.mjs'
   );
 
   const vision = await FilesetResolver.forVisionTasks(
-    '/mediapipe/wasm'
+    '/node_modules/@mediapipe/tasks-vision/wasm'
   );
 
   handLandmarker = await HandLandmarker.createFromOptions(vision, {
