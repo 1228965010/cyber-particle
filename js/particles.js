@@ -47,10 +47,10 @@ function createGlowTexture() {
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.04, 'rgba(255,255,255,0.9)');
-  gradient.addColorStop(0.12, 'rgba(255,255,255,0.5)');
-  gradient.addColorStop(0.3, 'rgba(255,255,255,0.12)');
-  gradient.addColorStop(0.55, 'rgba(255,255,255,0.02)');
+  gradient.addColorStop(0.15, 'rgba(255,255,255,0.9)');
+  gradient.addColorStop(0.35, 'rgba(255,255,255,0.5)');
+  gradient.addColorStop(0.55, 'rgba(255,255,255,0.15)');
+  gradient.addColorStop(0.75, 'rgba(255,255,255,0.03)');
   gradient.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
@@ -91,9 +91,9 @@ export function initParticles(canvas) {
   for (let i = 0; i < ParticleCount; i++) {
     const i3 = i * 3;
     // Spread across entire visible volume (wider than screen)
-    const x = (Math.random() - 0.5) * 14;
-    const y = (Math.random() - 0.5) * 10;
-    const z = (Math.random() - 0.5) * 8;
+    const x = (Math.random() - 0.5) * 10;
+    const y = (Math.random() - 0.5) * 7;
+    const z = (Math.random() - 0.5) * 5;
     positions[i3] = x;
     positions[i3 + 1] = y;
     positions[i3 + 2] = z;
@@ -114,7 +114,7 @@ export function initParticles(canvas) {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const material = new THREE.PointsMaterial({
-    size: 0.05,
+    size: 0.25,
     map: glowTexture,
     vertexColors: true,
     blending: THREE.AdditiveBlending,
@@ -194,13 +194,13 @@ function animate() {
       if (distToHand < influenceRadius) {
         const influence = 1.0 - distToHand / influenceRadius;
         // Push particles outward from hand (ripple)
-        const pushForce = influence * influence * 0.04;
+        const pushForce = influence * influence * 0.08;
         fx += (dx / distToHand) * pushForce;
         fy += (dy / distToHand) * pushForce;
         fz += (dz / distToHand) * pushForce * 0.5;
 
         // Tangential swirl
-        const swirlForce = influence * 0.01;
+        const swirlForce = influence * 0.025;
         fx += -dz * swirlForce;
         fz += dx * swirlForce;
       }
@@ -224,7 +224,7 @@ function animate() {
     const cc = currentPalette[i % currentPalette.length];
     const blended = lerpColor(cc, tc, lerpT);
 
-    let brightness = 0.35 + 0.15 * Math.sin(phases[i] + time * 0.5);
+    let brightness = 0.55 + 0.2 * Math.sin(phases[i] + time * 0.5);
     if (hasHand && distToHand < 4.0) {
       brightness += (1.0 - distToHand / 4.0) * 0.5;
     }
