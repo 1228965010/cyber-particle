@@ -13,27 +13,28 @@ npx serve . -p 3456
 
 ## 手势
 
-| 手势 | 效果 | 颜色 |
-|------|------|------|
-| 🖐️ 张开手掌 | 粒子从手心向外爆散 | 青蓝 |
-| ✊ 握拳 | 粒子螺旋吸入形成漩涡 | 品红 |
-| ☝️ 食指指向 | 粒子沿食指方向渐进汇流 | 赤红 |
-| 🤏 五指捏合 | 粒子汇聚成爱心形状 | 粉色 |
+| 手势 | HUD | 效果 | 颜色 |
+|------|-----|------|------|
+| 🖐️ 张开手掌 | NEBULA | 粒子从手心向外爆散 | 青蓝 |
+| ✊ 握拳 | SPHERE | 粒子螺旋吸入形成漩涡 | 品红 |
+| ☝️ 食指指向 | BEAM | 粒子沿食指方向渐进汇流 | 赤红 |
+| 🤏 五指捏合 | HEART | 粒子汇聚成脉动爱心 | 粉色 |
 
-手离摄像头越近，粒子运动速度越快。
-
-## 技术栈
-
-- **手势识别**：MediaPipe HandLandmarker（`@mediapipe/tasks-vision`）
-- **粒子渲染**：Three.js BufferGeometry + AdditiveBlending
-- **后处理**：CSS CRT 扫描线 + 暗角
-- **纯前端**：无后端、无框架、单 HTML 页面
+- 手离摄像头越近，粒子运动越快
+- 握拳/捏合时手离得越近图案越小越聚集，越远越大
 
 ## 按键
 
 - `1` — 5000 粒子
 - `2` — 8000 粒子
-- `3` — 15000 粒子（默认）
+- `3` — 10000 粒子（默认）
+
+## 技术栈
+
+- **手势识别**：MediaPipe HandLandmarker（`@mediapipe/tasks-vision`）
+- **粒子渲染**：Three.js BufferGeometry + AdditiveBlending 发光纹理
+- **后处理**：CSS CRT 扫描线 + 暗角
+- **纯前端**：无后端、无框架、单 HTML 页面
 
 ## 项目结构
 
@@ -44,7 +45,7 @@ npx serve . -p 3456
 │   ├── gesture.js      # MediaPipe 初始化 + 手势分类
 │   ├── particles.js    # Three.js 粒子系统 + 手势行为
 │   └── hud.js          # FPS、手势名、置信度显示
-└── mediapipe/
-    ├── model/           # 手部关键点模型
-    └── wasm/            # MediaPipe WASM（备用）
+├── mediapipe/
+│   └── model/          # 手部关键点模型
+└── node_modules/       # @mediapipe/tasks-vision (WASM)
 ```
