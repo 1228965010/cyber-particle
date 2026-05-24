@@ -85,8 +85,8 @@ function detectLoop() {
 function processResults(results) {
   if (results.landmarks && results.landmarks.length > 0) {
     const lm = results.landmarks[0];
-    if (results.handedness && results.handedness.length > 0) {
-      handConfidence = results.handedness[0].score;
+    if (results.handednesses && results.handednesses.length > 0 && results.handednesses[0].length > 0) {
+      handConfidence = results.handednesses[0][0].score;
     } else {
       handConfidence = 0.8; // fallback if handedness not available
     }
