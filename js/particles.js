@@ -217,19 +217,39 @@ function animate() {
           }
           break;
 
-        // ===== 3. POINT: stream in pointing direction =====
+        // ===== 3. POINT: gradual stream in pointing direction =====
         case 'point': {
           const dirLen = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
           const ndx = pdx / dirLen, ndy = pdy / dirLen;
+          // Perpendicular direction for stream width
+          const perpX = -ndy, perpY = ndx;
+
+          // Distance from the stream axis (line through hand in pointing direction)
+          const proj = dx * ndx + dy * ndy; // projection along direction
+          const perp = -dx * ndy + dy * ndx; // perpendicular distance to axis
+
           if (dist < influenceRadius) {
-            // Push particles in pointing direction
-            const stream = 0.05;
-            velocities[i3] += ndx * stream;
-            velocities[i3 + 1] += ndy * stream;
-            // Spread perpendicular to direction
-            const perpX = -ndy, perpY = ndx;
-            velocities[i3] += perpX * (pz * 0.01);
-            velocities[i3 + 1] += perpY * (pz * 0.01);
+            const depth = 1.0 - dist / influenceRadius;
+
+            // Pull particles toward the stream axis (perpendicular correction)
+            const axisPull = 0.02 * depth;
+            velocities[i3] -= perpX * perp * axisPull * 0.1;
+            velocities[i3 + 1] -= perpY * perp * axisPull * 0.1;
+
+            // Once near axis, accelerate along pointing direction
+            const streamWidth = Math.abs(perp);
+            if (streamWidth < 1.5) {
+              const streamForce = 0.03 * (1.0 - streamWidth / 1.5);
+              velocities[i3] += ndx * streamForce;
+              velocities[i3 + 1] += ndy * streamForce;
+            }
+
+            // Particles behind the hand get stronger push forward
+            if (proj < 0) {
+              const push = 0.02 * depth;
+              velocities[i3] += ndx * push;
+              velocities[i3 + 1] += ndy * push;
+            }
           }
           break;
         }
