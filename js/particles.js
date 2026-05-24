@@ -32,6 +32,7 @@ const palettes = {
   point: [[1.0, 0.1, 0.2], [1.0, 0.4, 0.1], [0.9, 0.2, 0.4]],
 };
 
+let prevGesture = 'open';
 const cursor3D = new THREE.Vector3(0, 0, 0);
 const cursorTarget = new THREE.Vector3(0, 0, 0);
 
@@ -138,6 +139,22 @@ function animate() {
 
   const palette = palettes[gesture] || palettes.open;
   const hx = cursor3D.x, hy = cursor3D.y, hz = cursor3D.z;
+
+  // When gesture changes, respawn all particles around hand position
+  if (gesture !== prevGesture) {
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      const a = Math.random() * Math.PI * 2;
+      const r = 1.5 + Math.random() * 2.5;
+      positions[i3] = hx + Math.cos(a) * r;
+      positions[i3 + 1] = hy + Math.sin(a) * r;
+      positions[i3 + 2] = hz + (Math.random() - 0.5) * 2;
+      velocities[i3] = 0;
+      velocities[i3 + 1] = 0;
+      velocities[i3 + 2] = 0;
+    }
+    prevGesture = gesture;
+  }
 
   // Point direction
   const pd = getPointDirection();
