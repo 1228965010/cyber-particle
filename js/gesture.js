@@ -37,7 +37,12 @@ export async function initGesture(videoEl) {
     minTrackingConfidence: 0.5,
   });
 
+  let resultCount = 0;
   hands.onResults((results) => {
+    resultCount++;
+    if (resultCount <= 3 || resultCount % 60 === 0) {
+      console.log(`onResults #${resultCount}: landmarks=${results.multiHandLandmarks?.length || 0}, handedness=${results.multiHandedness?.length || 0}`);
+    }
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
       const lm = results.multiHandLandmarks[0];
       handConfidence =
@@ -71,10 +76,19 @@ export async function initGesture(videoEl) {
   requestAnimationFrame(detectLoop);
 }
 
+let sendCount = 0;
 async function detectLoop() {
   if (!running || !videoElement) return;
+  sendCount++;
+  if (sendCount <= 3 || sendCount % 60 === 0) {
+    console.log(`detectLoop #${sendCount}: readyState=${videoElement.readyState}, hands=${!!hands}`);
+  }
   if (videoElement.readyState >= 2) {
-    await hands.send({ image: videoElement });
+    try {
+      await hands.send({ image: videoElement });
+    } catch (e) {
+      console.error('hands.send error:', e.message || e);
+    }
   }
   requestAnimationFrame(detectLoop);
 }
