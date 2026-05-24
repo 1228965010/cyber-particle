@@ -160,28 +160,30 @@ function animate() {
       switch (gesture) {
         // ===== 1. FIST: converge + vortex =====
         case 'fist':
-          if (dist < influenceRadius) {
+          if (dist < 0.2) {
+            // Core respawn
+            const a = Math.random() * Math.PI * 2;
+            const r = 0.3 + Math.random() * 5;
+            positions[i3] = hx + Math.cos(a) * r;
+            positions[i3 + 1] = hy + Math.sin(a) * r;
+            positions[i3 + 2] = hz + (Math.random() - 0.5) * 3;
+            velocities[i3] = 0;
+            velocities[i3 + 1] = 0;
+            velocities[i3 + 2] = 0;
+          } else if (dist < influenceRadius) {
             const depth = 1.0 - dist / influenceRadius;
-            // Strong suction toward center
             const suck = 0.06 / (dist * dist + 0.05);
             velocities[i3] -= (dx / dist) * suck;
             velocities[i3 + 1] -= (dy / dist) * suck;
             velocities[i3 + 2] -= (dz / dist) * suck * 0.4;
-            // Spiral faster when closer
             const swirl = 0.03 * depth * depth;
             velocities[i3] += -dy * swirl;
             velocities[i3 + 1] += dx * swirl;
-            // Respawn particles at wide spread when they reach the core
-            if (dist < 0.2) {
-              const a = Math.random() * Math.PI * 2;
-              const r = 0.3 + Math.random() * 5;
-              positions[i3] = hx + Math.cos(a) * r;
-              positions[i3 + 1] = hy + Math.sin(a) * r;
-              positions[i3 + 2] = hz + (Math.random() - 0.5) * 3;
-              velocities[i3] = 0;
-              velocities[i3 + 1] = 0;
-              velocities[i3 + 2] = 0;
-            }
+          } else {
+            // Gentle pull from anywhere on screen
+            const pull = 0.003;
+            velocities[i3] -= (dx / dist) * pull;
+            velocities[i3 + 1] -= (dy / dist) * pull;
           }
           break;
 
@@ -239,36 +241,35 @@ function animate() {
 
         // ===== 4. PINCH: converge into small circle =====
         case 'pinch':
-          if (dist < influenceRadius) {
+          if (dist < 0.15) {
+            const a = Math.random() * Math.PI * 2;
+            const r = 0.3 + Math.random() * 5;
+            positions[i3] = hx + Math.cos(a) * r;
+            positions[i3 + 1] = hy + Math.sin(a) * r;
+            positions[i3 + 2] = hz + (Math.random() - 0.5) * 3;
+            velocities[i3] = 0;
+            velocities[i3 + 1] = 0;
+            velocities[i3 + 2] = 0;
+          } else if (dist < influenceRadius) {
             const depth = 1.0 - dist / influenceRadius;
-            // Pull toward hand
             const pull = 0.04 * depth;
             velocities[i3] -= (dx / dist) * pull;
             velocities[i3 + 1] -= (dy / dist) * pull;
             velocities[i3 + 2] -= (dz / dist) * pull * 0.4;
-            // Orbit at a specific radius to form a ring
             const ringRadius = 0.6;
             if (dist < ringRadius * 1.5) {
-              // Tangential force to maintain orbit
               const orbitForce = 0.02;
               velocities[i3] += -dy * orbitForce;
               velocities[i3 + 1] += dx * orbitForce;
-              // Radial correction: push to ring radius
               const radialCorr = (dist - ringRadius) * 0.03;
               velocities[i3] -= (dx / dist) * radialCorr;
               velocities[i3 + 1] -= (dy / dist) * radialCorr;
             }
-            // Respawn particles that hit the very center
-            if (dist < 0.15) {
-              const a = Math.random() * Math.PI * 2;
-              const r = 0.3 + Math.random() * 5;
-              positions[i3] = hx + Math.cos(a) * r;
-              positions[i3 + 1] = hy + Math.sin(a) * r;
-              positions[i3 + 2] = hz + (Math.random() - 0.5) * 3;
-              velocities[i3] = 0;
-              velocities[i3 + 1] = 0;
-              velocities[i3 + 2] = 0;
-            }
+          } else {
+            // Gentle pull from anywhere
+            const pull = 0.003;
+            velocities[i3] -= (dx / dist) * pull;
+            velocities[i3 + 1] -= (dy / dist) * pull;
           }
           break;
       }
