@@ -161,33 +161,42 @@ function animate() {
       const influenceRadius = 4.5 * patternScale;
 
       switch (gesture) {
-        // ===== 1. FIST: converge + vortex =====
-        case 'fist':
-          if (dist < 0.2) {
-            // Core respawn
+        // ===== 1. FIST: 3D tornado vortex =====
+        case 'fist': {
+          const maxR = influenceRadius;
+          if (dist < 0.15) {
+            // Core: respawn to outer ring
             const a = Math.random() * Math.PI * 2;
-            const r = 0.3 + Math.random() * 5;
+            const r = maxR * 0.7 + Math.random() * maxR * 0.3;
             positions[i3] = hx + Math.cos(a) * r;
             positions[i3 + 1] = hy + Math.sin(a) * r;
-            positions[i3 + 2] = hz + (Math.random() - 0.5) * 3;
+            positions[i3 + 2] = hz + (Math.random() - 0.5) * 2;
             velocities[i3] = 0;
             velocities[i3 + 1] = 0;
             velocities[i3 + 2] = 0;
-          } else if (dist < influenceRadius) {
-            const depth = 1.0 - dist / influenceRadius;
-            const suck = 0.06 / (dist * dist + 0.05) * speedMul;
+          } else if (dist < maxR) {
+            // Radial pull: increases as 1/r, like real vortex
+            const suck = 0.02 * speedMul / Math.max(dist, 0.06);
             velocities[i3] -= (dx / dist) * suck;
             velocities[i3 + 1] -= (dy / dist) * suck;
-            velocities[i3 + 2] -= (dz / dist) * suck * 0.4;
-            const swirl = 0.03 * depth * depth * speedMul;
-            velocities[i3] += -dy * swirl;
-            velocities[i3 + 1] += dx * swirl;
+            // Tangential: v ~ 1/r (conservation of angular momentum)
+            const tangent = 0.015 * speedMul / Math.max(dist, 0.08);
+            velocities[i3] += -dy * tangent;
+            velocities[i3 + 1] += dx * tangent;
+            // Vertical spiral: particles rise near center, sink at edges
+            const vertSpeed = 0.003 * speedMul * (1.0 - dist / maxR);
+            velocities[i3 + 2] += vertSpeed * (dist < maxR * 0.3 ? 1 : -0.5);
+            // Random turbulence for organic feel
+            velocities[i3] += (Math.random() - 0.5) * 0.002 * speedMul;
+            velocities[i3 + 1] += (Math.random() - 0.5) * 0.002 * speedMul;
           } else {
-            const pull = 0.003 * speedMul;
+            // Gentle drift toward vortex from far away
+            const pull = 0.002 * speedMul;
             velocities[i3] -= (dx / dist) * pull;
             velocities[i3 + 1] -= (dy / dist) * pull;
           }
           break;
+        }
 
         // ===== 2. OPEN: burst outward from center =====
         case 'open':
