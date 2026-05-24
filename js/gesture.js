@@ -11,6 +11,7 @@ let currentGesture = 'open';
 let lastSwitchTime = 0;
 let handCenter = { x: 0.5, y: 0.5 };
 let handConfidence = 0;
+let hands = null;
 let running = false;
 let cameraStream = null;
 let videoElement = null;
@@ -22,7 +23,7 @@ export function getConfidence() { return handConfidence; }
 export async function initGesture(videoEl) {
   videoElement = videoEl;
 
-  const hands = new Hands({
+  hands = new Hands({
     locateFile: (file) =>
       `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
   });
