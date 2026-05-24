@@ -237,38 +237,32 @@ function animate() {
           break;
         }
 
-        // ===== 4. PINCH: converge into small circle =====
-        case 'pinch':
-          if (dist < 0.15) {
-            const a = Math.random() * Math.PI * 2;
-            const r = 0.3 + Math.random() * 5;
-            positions[i3] = hx + Math.cos(a) * r;
-            positions[i3 + 1] = hy + Math.sin(a) * r;
-            positions[i3 + 2] = hz + (Math.random() - 0.5) * 3;
-            velocities[i3] = 0;
-            velocities[i3 + 1] = 0;
-            velocities[i3 + 2] = 0;
-          } else if (dist < influenceRadius) {
+        // ===== 4. PINCH: converge into heart shape =====
+        case 'pinch': {
+          // Heart parametric: each particle mapped to a point on the heart
+          const t = (i / particleCount) * Math.PI * 2;
+          const st = Math.sin(t), ct = Math.cos(t);
+          const hx0 = 16 * st * st * st;
+          const hy0 = 13 * ct - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+          const heartScale = 0.045;
+          const heartX = hx + hx0 * heartScale;
+          const heartY = hy - hy0 * heartScale; // flip Y for screen coords
+          const heartZ = hz + (pz - hz) * 0.1 + Math.sin(t * 3) * 0.15;
+
+          if (dist < influenceRadius) {
             const depth = 1.0 - dist / influenceRadius;
-            const pull = 0.04 * depth * speedMul;
-            velocities[i3] -= (dx / dist) * pull;
-            velocities[i3 + 1] -= (dy / dist) * pull;
-            velocities[i3 + 2] -= (dz / dist) * pull * 0.4;
-            const ringRadius = 0.6;
-            if (dist < ringRadius * 1.5) {
-              const orbitForce = 0.02 * speedMul;
-              velocities[i3] += -dy * orbitForce;
-              velocities[i3 + 1] += dx * orbitForce;
-              const radialCorr = (dist - ringRadius) * 0.03 * speedMul;
-              velocities[i3] -= (dx / dist) * radialCorr;
-              velocities[i3 + 1] -= (dy / dist) * radialCorr;
-            }
+            // Pull toward heart target position
+            const pull = 0.05 * depth * speedMul;
+            velocities[i3] += (heartX - px) * pull;
+            velocities[i3 + 1] += (heartY - py) * pull;
+            velocities[i3 + 2] += (heartZ - pz) * pull;
           } else {
             const pull = 0.003 * speedMul;
             velocities[i3] -= (dx / dist) * pull;
             velocities[i3 + 1] -= (dy / dist) * pull;
           }
           break;
+        }
       }
 
     } else {
