@@ -139,9 +139,6 @@ function animate() {
   const palette = palettes[gesture] || palettes.open;
   const hx = cursor3D.x, hy = cursor3D.y, hz = cursor3D.z;
 
-  const palette = palettes[gesture] || palettes.open;
-  const hx = cursor3D.x, hy = cursor3D.y, hz = cursor3D.z;
-
   // Point direction
   const pd = getPointDirection();
   const pdx = pd.x, pdy = -pd.y; // flip Y to match 3D space
