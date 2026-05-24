@@ -118,10 +118,10 @@ export function initParticles(canvas) {
 function respawnParticle(i3, cx, cy, cz) {
   // Respawn at outer edge of vortex
   const angle = Math.random() * Math.PI * 2;
-  const radius = 3.0 + Math.random() * 2.5;
+  const radius = 2.5 + Math.random() * 1.0;
   positions[i3] = cx + Math.cos(angle) * radius;
   positions[i3 + 1] = cy + Math.sin(angle) * radius;
-  positions[i3 + 2] = cz + (Math.random() - 0.5) * 2;
+  positions[i3 + 2] = cz + (Math.random() - 0.5) * 1.5;
   velocities[i3] = 0;
   velocities[i3 + 1] = 0;
   velocities[i3 + 2] = 0;
@@ -149,10 +149,10 @@ function animate() {
   const hx = cursor3D.x, hy = cursor3D.y, hz = cursor3D.z;
 
   // Vortex parameters
-  const suckStrength = 0.015;      // inward pull
-  const swirlStrength = 0.025;     // tangential spin
-  const coreRadius = 0.2;          // particles inside this get respawned
-  const vortexRadius = 5.0;        // particles outside this don't feel vortex
+  const suckStrength = 0.08;       // inward pull (strong)
+  const swirlStrength = 0.015;     // tangential spin (gentler than suck)
+  const coreRadius = 0.25;         // particles inside this get respawned
+  const vortexRadius = 3.5;        // max vortex reach (visible area only)
 
   for (let i = 0; i < particleCount; i++) {
     const i3 = i * 3;
@@ -172,41 +172,40 @@ function animate() {
         continue;
       }
 
-      // Suck inward (stronger closer to center)
-      const suck = suckStrength / Math.max(dist, coreRadius);
+      // How deep in the vortex (1 at core, 0 at edge)
+      const depth = 1.0 - dist / vortexRadius;
+
+      // Suck inward: strong constant pull toward center
+      const suck = suckStrength * (0.3 + depth * 0.7);
       velocities[i3] -= (dx / dist) * suck;
       velocities[i3 + 1] -= (dy / dist) * suck;
-      velocities[i3 + 2] -= (dz / dist) * suck * 0.4;
+      velocities[i3 + 2] -= (dz / dist) * suck * 0.3;
 
-      // Swirl around (tangential)
-      velocities[i3] += -dy * swirlStrength * 0.001;
-      velocities[i3 + 1] += dx * swirlStrength * 0.001;
+      // Swirl: spin around center (faster when closer)
+      const swirl = swirlStrength * depth;
+      velocities[i3] += -dy * swirl;
+      velocities[i3 + 1] += dx * swirl;
 
-      // Swirl faster closer to center
-      const tangStrength = swirlStrength / Math.max(dist * dist, 0.1);
-      velocities[i3] += -dy * tangStrength;
-      velocities[i3 + 1] += dx * tangStrength;
-
-      // Gesture-specific modulation
+      // Gesture modulation
       switch (gesture) {
         case 'open':
-          // Wider, slower vortex
-          velocities[i3] *= 0.98;
-          velocities[i3 + 1] *= 0.98;
+          // Slower, wider
+          velocities[i3] *= 0.95;
+          velocities[i3 + 1] *= 0.95;
           break;
         case 'fist':
-          // Faster, tighter vortex
-          velocities[i3] -= (dx / dist) * suck * 0.8;
-          velocities[i3 + 1] -= (dy / dist) * suck * 0.8;
+          // Extra suction
+          velocities[i3] -= (dx / dist) * suck * 0.5;
+          velocities[i3 + 1] -= (dy / dist) * suck * 0.5;
           break;
         case 'pinch':
-          // Strong spiral
-          velocities[i3] += -dy * tangStrength * 0.5;
-          velocities[i3 + 1] += dx * tangStrength * 0.5;
+          // Extra swirl
+          velocities[i3] += -dy * swirl * 0.8;
+          velocities[i3 + 1] += dx * swirl * 0.8;
           break;
         case 'point':
-          // Directional pull to the right
-          velocities[i3] += 0.003;
+          // Pull rightward
+          velocities[i3] += 0.005;
           break;
       }
 
