@@ -103,21 +103,19 @@ function classifyGesture(lm) {
   const now = performance.now();
   if (now - lastSwitchTime < DebounceMs) return;
 
-  // Finger extension: compare tip to PIP (more reliable than tip-to-MCP)
-  // PIP joints: thumb=3, index=6, middle=10, ring=14, pinky=18
+  // Finger extension: compare tip to PIP
   const PipIds = [3, 6, 10, 14, 18];
-
   const fingersExtended = [];
   for (let i = 0; i < 5; i++) {
     const tip = lm[FingerTipIds[i]];
     const pip = lm[PipIds[i]];
     if (i === 0) {
-      // Thumb: check horizontal spread (thumb tip x vs index mcp x)
+      // Thumb: check horizontal spread vs index MCP
       const indexMcp = lm[5];
-      fingersExtended.push(Math.abs(tip.x - indexMcp.x) > 0.08);
+      fingersExtended.push(Math.abs(tip.x - indexMcp.x) > 0.06);
     } else {
-      // Other fingers: tip should be above PIP (smaller y = higher on screen)
-      fingersExtended.push(pip.y - tip.y > 0.02);
+      // Other fingers: tip above PIP = extended
+      fingersExtended.push(pip.y - tip.y > 0.015);
     }
   }
 
@@ -125,16 +123,24 @@ function classifyGesture(lm) {
   const thumbTip = lm[4];
   const indexTip = lm[8];
   const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+  const extendedCount = fingersExtended.filter(Boolean).length;
 
   let gesture = currentGesture;
 
-  if (pinchDist < 0.05 && !middle && !ring && !pinky) {
+  // Pinch: thumb+index tips very close
+  if (pinchDist < 0.06 && middle === false && ring === false) {
     gesture = 'pinch';
-  } else if (index && !middle && !ring && !pinky) {
+  }
+  // Point: only index clearly extended
+  else if (index && middle === false && ring === false && pinky === false) {
     gesture = 'point';
-  } else if (fingersExtended.every(Boolean)) {
+  }
+  // Open: most fingers extended (≥4)
+  else if (extendedCount >= 4) {
     gesture = 'open';
-  } else if (fingersExtended.every((f) => !f)) {
+  }
+  // Fist: most fingers closed (≤1)
+  else if (extendedCount <= 1) {
     gesture = 'fist';
   }
 
