@@ -4,7 +4,7 @@ import { getGesture, getConfidence, isRunning } from './gesture.js';
 const gestureNames = {
   open: 'NEBULA',
   fist: 'SPHERE',
-  pinch: 'SPIRAL',
+  pinch: 'HEART',
   point: 'BEAM',
 };
 
