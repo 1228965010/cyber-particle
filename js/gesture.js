@@ -1,31 +1,25 @@
 // Cyber Particle — Gesture Detection via MediaPipe Hands
-// Uses @mediapipe/hands (stable callback-based API)
+// Uses @mediapipe/hands + Camera utility (official pattern)
 
 const DebounceMs = 250;
 const FingerTipIds = [4, 8, 12, 16, 20];
 const FingerMcpIds = [1, 5, 9, 13, 17];
 const MiddleMcpId = 9;
 
-let hands = null;
+let camera = null;
 let currentGesture = 'open';
 let lastSwitchTime = 0;
 let handCenter = { x: 0.5, y: 0.5 };
 let handConfidence = 0;
 let running = false;
-let cameraStream = null;
-let videoElement = null;
-let initError = null;
 
 export function getGesture() { return currentGesture; }
 export function getHandCenter() { return handCenter; }
 export function getConfidence() { return handConfidence; }
-export function getInitError() { return initError; }
 export function isRunning() { return running; }
 
 export async function initGesture(videoEl) {
-  videoElement = videoEl;
-
-  hands = new Hands({
+  const hands = new Hands({
     locateFile: (file) =>
       `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
   });
@@ -41,7 +35,7 @@ export async function initGesture(videoEl) {
   hands.onResults((results) => {
     resultCount++;
     if (resultCount <= 3 || resultCount % 60 === 0) {
-      console.log(`onResults #${resultCount}: landmarks=${results.multiHandLandmarks?.length || 0}, handedness=${results.multiHandedness?.length || 0}`);
+      console.log(`onResults #${resultCount}: landmarks=${results.multiHandLandmarks?.length || 0}`);
     }
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
       const lm = results.multiHandLandmarks[0];
@@ -56,14 +50,19 @@ export async function initGesture(videoEl) {
     }
   });
 
+  camera = new Camera(videoEl, {
+    onFrame: async () => {
+      await hands.send({ image: videoEl });
+    },
+    width: 1280,
+    height: 720,
+  });
+
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 1280, height: 720, facingMode: 'user' },
-    });
-    videoEl.srcObject = cameraStream;
-    await videoEl.play();
+    await camera.start();
+    running = true;
+    console.log('Camera started, gesture detection active');
   } catch (err) {
-    initError = err;
     if (err.name === 'NotAllowedError') {
       document.getElementById('permission-prompt').classList.remove('hidden');
       document.getElementById('enable-camera').onclick = () => location.reload();
@@ -71,26 +70,6 @@ export async function initGesture(videoEl) {
     }
     throw err;
   }
-
-  running = true;
-  requestAnimationFrame(detectLoop);
-}
-
-let sendCount = 0;
-async function detectLoop() {
-  if (!running || !videoElement) return;
-  sendCount++;
-  if (sendCount <= 3 || sendCount % 60 === 0) {
-    console.log(`detectLoop #${sendCount}: readyState=${videoElement.readyState}, hands=${!!hands}`);
-  }
-  if (videoElement.readyState >= 2) {
-    try {
-      await hands.send({ image: videoElement });
-    } catch (e) {
-      console.error('hands.send error:', e.message || e);
-    }
-  }
-  requestAnimationFrame(detectLoop);
 }
 
 function classifyGesture(lm) {
@@ -130,7 +109,8 @@ function classifyGesture(lm) {
 
 export function stopGesture() {
   running = false;
-  if (cameraStream) {
-    cameraStream.getTracks().forEach((t) => t.stop());
+  if (camera) {
+    camera.stop();
+    camera = null;
   }
 }
