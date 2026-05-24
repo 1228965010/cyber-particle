@@ -96,17 +96,27 @@ function classifyGesture(lm) {
   const now = performance.now();
   if (now - lastSwitchTime < DebounceMs) return;
 
+  // Finger extension: compare tip to PIP (more reliable than tip-to-MCP)
+  // PIP joints: thumb=3, index=6, middle=10, ring=14, pinky=18
+  const PipIds = [3, 6, 10, 14, 18];
+
   const fingersExtended = [];
   for (let i = 0; i < 5; i++) {
     const tip = lm[FingerTipIds[i]];
-    const mcp = lm[FingerMcpIds[i]];
-    const dist = Math.hypot(tip.x - mcp.x, tip.y - mcp.y);
-    fingersExtended.push(dist > 0.15);
+    const pip = lm[PipIds[i]];
+    if (i === 0) {
+      // Thumb: check horizontal spread (thumb tip x vs index mcp x)
+      const indexMcp = lm[5];
+      fingersExtended.push(Math.abs(tip.x - indexMcp.x) > 0.08);
+    } else {
+      // Other fingers: tip should be above PIP (smaller y = higher on screen)
+      fingersExtended.push(pip.y - tip.y > 0.02);
+    }
   }
 
   const [thumb, index, middle, ring, pinky] = fingersExtended;
-  const thumbTip = lm[FingerTipIds[0]];
-  const indexTip = lm[FingerTipIds[1]];
+  const thumbTip = lm[4];
+  const indexTip = lm[8];
   const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
 
   let gesture = currentGesture;
